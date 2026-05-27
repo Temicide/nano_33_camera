@@ -2,6 +2,11 @@
 #include <TinyMLShield.h>
 #include <Wire.h>
 
+#if __has_include(<blister_counter_inferencing.h>)
+#include <blister_counter_inferencing.h>
+#define HAS_EI_MODEL 1
+#endif
+
 #if defined(ARDUINO_ARCH_MBED)
 #include <mbed.h>
 #endif
@@ -17,6 +22,14 @@ constexpr uint8_t kFormatGrayscale = 0;
 constexpr uint32_t kFrameBytes =
     static_cast<uint32_t>(kFrameWidth) * kFrameHeight * kBytesPerPixel;
 constexpr uint8_t kFrameMagic[] = {'O', 'V', 'F', '1'};
+#if defined(HAS_EI_MODEL)
+constexpr uint16_t kInferWidth = 96;
+constexpr uint16_t kInferHeight = 96;
+constexpr uint16_t kCropX = (kFrameWidth - kInferWidth) / 2;
+constexpr uint16_t kCropY = (kFrameHeight - kInferHeight) / 2;
+constexpr float kConfidenceThreshold = 0.5f;
+constexpr uint32_t kCountIntervalMs = 500;
+#endif
 constexpr uint32_t kWatchdogTimeoutMs = 8000;
 constexpr int kFaceExposure = 900;
 constexpr int kFaceGain = 145;
@@ -93,6 +106,10 @@ int rdOV7675Reg(uint8_t reg, uint8_t &value) {
 static uint8_t g_frame[kFrameBytes];
 static bool g_streaming = false;
 static uint32_t g_frameNumber = 0;
+#if defined(HAS_EI_MODEL)
+static uint8_t g_ei_frame[kInferWidth * kInferHeight];
+static bool g_counting = false;
+#endif
 
 #if defined(DEVICE_WATCHDOG)
 mbed::Watchdog *g_watchdog = nullptr;
@@ -152,7 +169,8 @@ void printReady() {
   Serial.print("bytes_per_frame=");
   Serial.println(kFrameBytes);
   Serial.println(
-      "commands: S=start, P=pause, F=face exposure, A=auto exposure, C=calibrated exposure, ?=status");
+      "commands: S=start, P=pause, C=count, K=continuous count, X=stop count, "
+      "F=face exp, A=auto exp, c=cal exp, ?=status");
 }
 
 // Manual face-tuned preset. Locks AGC/AEC and (on this sensor) effectively
@@ -205,6 +223,65 @@ void warmupCamera(uint8_t frames) {
   }
 }
 
+#if defined(HAS_EI_MODEL)
+
+void cropFrame() {
+  for (uint16_t y = 0; y < kInferHeight; ++y) {
+    memcpy(&g_ei_frame[y * kInferWidth],
+           &g_frame[(y + kCropY) * kFrameWidth + kCropX], kInferWidth);
+  }
+}
+
+int ei_get_frame_data(size_t offset, size_t length, float *out_ptr) {
+  const uint8_t *buf = g_ei_frame + offset;
+  for (size_t i = 0; i < length; ++i) {
+    out_ptr[i] = static_cast<float>(buf[i]);
+  }
+  return 0;
+}
+
+int countDetections(const ei_impulse_result_t &result) {
+  int count = 0;
+  for (uint32_t i = 0; i < result.bounding_boxes_count; ++i) {
+    const auto &bb = result.bounding_boxes[i];
+    if (bb.value >= kConfidenceThreshold && strcmp(bb.label, "blister") == 0) {
+      ++count;
+      Serial.print("  det: ");
+      Serial.print(bb.label);
+      Serial.print(" @ (");
+      Serial.print(bb.x);
+      Serial.print(",");
+      Serial.print(bb.y);
+      Serial.print(") conf=");
+      Serial.println(bb.value, 2);
+    }
+  }
+  return count;
+}
+
+void doSingleCount() {
+  Camera.readFrame(g_frame);
+  cropFrame();
+
+  signal_t signal;
+  signal.total_length = kInferWidth * kInferHeight;
+  signal.get_data = &ei_get_frame_data;
+
+  ei_impulse_result_t result;
+  EI_IMPULSE_ERROR err = run_classifier(&signal, &result, false);
+  if (err != EI_IMPULSE_OK) {
+    Serial.print("INFERENCE_ERROR: ");
+    Serial.println(err);
+    return;
+  }
+
+  int count = countDetections(result);
+  Serial.print("COUNT: ");
+  Serial.println(count);
+}
+
+#endif
+
 void fatalBlink(const char *message) {
   Serial.println(message);
   pinMode(LED_BUILTIN, OUTPUT);
@@ -242,6 +319,27 @@ void handleSerialCommands() {
       applyAutoExposure();
       break;
     case 'C':
+#if defined(HAS_EI_MODEL)
+      g_streaming = false;
+      g_counting = false;
+      doSingleCount();
+#else
+      Serial.println("NO_MODEL: deploy Edge Impulse library first");
+#endif
+      break;
+#if defined(HAS_EI_MODEL)
+    case 'K':
+    case 'k':
+      g_streaming = false;
+      g_counting = true;
+      Serial.println("COUNTING");
+      break;
+    case 'X':
+    case 'x':
+      g_counting = false;
+      Serial.println("STOPPED");
+      break;
+#endif
     case 'c':
       applyCalibratedExposure();
       break;
@@ -310,6 +408,15 @@ void setup() {
 void loop() {
   handleSerialCommands();
   kickWatchdog();
+
+#if defined(HAS_EI_MODEL)
+  if (g_counting) {
+    doSingleCount();
+    kickWatchdog();
+    delay(kCountIntervalMs);
+    return;
+  }
+#endif
 
   if (!g_streaming) {
     delay(10);
