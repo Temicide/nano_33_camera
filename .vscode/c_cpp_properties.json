@@ -1,0 +1,28 @@
+{
+  "configurations": [
+    {
+      "name": "Nano 33 BLE",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "${env:HOME}/Library/Arduino15/packages/arduino/hardware/mbed_nano/4.5.0/cores/arduino",
+        "${env:HOME}/Library/Arduino15/packages/arduino/hardware/mbed_nano/4.5.0/variants/ARDUINO_NANO33BLE",
+        "${env:HOME}/Documents/Arduino/libraries/Arduino_OV767X/src",
+        "${env:HOME}/Library/Arduino15/packages/arduino/hardware/mbed_nano/4.5.0/libraries/Wire",
+        "${env:HOME}/Library/Arduino15/packages/arduino/hardware/mbed_nano/4.5.0/cores/arduino/api/deprecated",
+        "${env:HOME}/Library/Arduino15/packages/arduino/hardware/mbed_nano/4.5.0/cores/arduino/api/deprecated-avr-comp"
+      ],
+      "defines": [
+        "ARDUINO=10607",
+        "ARDUINO_ARDUINO_NANO33BLE",
+        "ARDUINO_ARCH_MBED",
+        "ARDUINO_ARCH_MBED_NANO",
+        "ARDUINO_ARCH_NRF52840"
+      ],
+      "compilerPath": "/usr/bin/clang++",
+      "cStandard": "c17",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "macos-clang-arm64"
+    }
+  ],
+  "version": 4
+}
