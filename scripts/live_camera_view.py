@@ -27,22 +27,31 @@ def find_nano_port():
     return None
 
 
-def rgb565_to_bgr(data, width, height, byte_order="big"):
-    if byte_order == "big":
-        pixels = np.frombuffer(data, dtype=">u2").astype(np.uint16)
+def decode_frame(data, width, height, fmt, byte_order="big"):
+    if fmt == 0:
+        gray = np.frombuffer(data, dtype=np.uint8).reshape((height, width))
+        return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+    elif fmt == 1:
+        if byte_order == "big":
+            pixels = np.frombuffer(data, dtype=">u2").astype(np.uint16)
+        else:
+            pixels = np.frombuffer(data, dtype="<u2").astype(np.uint16)
+
+        r = ((pixels >> 11) & 0x1F).astype(np.uint8)
+        g = ((pixels >> 5) & 0x3F).astype(np.uint8)
+        b = (pixels & 0x1F).astype(np.uint8)
+
+        r = (r << 3) | (r >> 2)
+        g = (g << 2) | (g >> 4)
+        b = (b << 3) | (b >> 2)
+
+        bgr = np.stack([b, g, r], axis=-1).reshape((height, width, 3))
+        return bgr
+    elif fmt == 2:
+        gray = np.frombuffer(data, dtype=np.uint8).reshape((height, width))
+        return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
     else:
-        pixels = np.frombuffer(data, dtype="<u2").astype(np.uint16)
-
-    r = ((pixels >> 11) & 0x1F).astype(np.uint8)
-    g = ((pixels >> 5) & 0x3F).astype(np.uint8)
-    b = (pixels & 0x1F).astype(np.uint8)
-
-    r = (r << 3) | (r >> 2)
-    g = (g << 2) | (g >> 4)
-    b = (b << 3) | (b >> 2)
-
-    bgr = np.stack([b, g, r], axis=-1).reshape((height, width, 3))
-    return bgr
+        raise ValueError(f"Unknown format: {fmt}")
 
 
 def apply_gray_world_wb(frame, gains=None):
@@ -112,6 +121,7 @@ def main():
     parser.add_argument("--baud", "-b", type=int, default=BAUD_RATE, help=f"Baud rate (default: {BAUD_RATE})")
     parser.add_argument("--mode", "-m", choices=["auto", "face", "calibrated", "stream"], default="auto",
                         help="Camera exposure mode (default: auto)")
+    parser.add_argument("--grayscale", action="store_true", help="Convert to grayscale display")
     parser.add_argument("--byte-order", choices=["big", "little"], default="big",
                         help="RGB565 byte order (default: big)")
     parser.add_argument("--no-white-balance", action="store_true", help="Disable host gray-world white balance")
@@ -177,6 +187,7 @@ def main():
 
     if not args.no_window:
         cv2.namedWindow(args.window_name, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(args.window_name, 640, 480)
 
     frame_count = 0
     fps_start = time.time()
@@ -208,14 +219,19 @@ def main():
 
             width, height, bpp, fmt, frame_num, frame_size = struct.unpack("<HHBBII", header)
 
-            if bpp != 2 or frame_size != width * height * 2:
+            expected_size = width * height * bpp
+            if frame_size != expected_size:
                 continue
 
             data = ser.read(frame_size)
             if len(data) < frame_size:
                 continue
 
-            frame = rgb565_to_bgr(data, width, height, args.byte_order)
+            frame = decode_frame(data, width, height, fmt, args.byte_order)
+
+            if args.grayscale:
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
             if not args.no_white_balance:
                 frame = apply_gray_world_wb(frame, wb_gains)
@@ -236,7 +252,8 @@ def main():
                 cv2.imwrite(str(args.save_latest), frame)
 
             if not args.no_window:
-                cv2.imshow(args.window_name, frame)
+                display_frame = cv2.resize(frame, (640, 480), interpolation=cv2.INTER_NEAREST)
+                cv2.imshow(args.window_name, display_frame)
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord("q") or key == 27:
                     break

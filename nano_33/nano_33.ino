@@ -10,10 +10,10 @@ namespace {
 
 constexpr unsigned long kSerialBaud = 921600;
 constexpr uint8_t kCameraFps = 5;
-constexpr uint16_t kFrameWidth = 320;
-constexpr uint16_t kFrameHeight = 240;
-constexpr uint8_t kBytesPerPixel = 2;
-constexpr uint8_t kFormatRgb565 = 1;
+constexpr uint16_t kFrameWidth = 160;
+constexpr uint16_t kFrameHeight = 120;
+constexpr uint8_t kBytesPerPixel = 1;
+constexpr uint8_t kFormatGrayscale = 0;
 constexpr uint32_t kFrameBytes =
     static_cast<uint32_t>(kFrameWidth) * kFrameHeight * kBytesPerPixel;
 constexpr uint8_t kFrameMagic[] = {'O', 'V', 'F', '1'};
@@ -137,7 +137,7 @@ void writeFrameHeader() {
   writeU16(kFrameWidth);
   writeU16(kFrameHeight);
   Serial.write(kBytesPerPixel);
-  Serial.write(kFormatRgb565);
+  Serial.write(kFormatGrayscale);
   writeU32(g_frameNumber);
   writeU32(kFrameBytes);
 }
@@ -265,21 +265,45 @@ void setup() {
   while (!Serial && (millis() - waitStart < 5000)) {
     delay(10);
   }
+  
+  Serial.println("DEBUG: Starting setup");
+  Serial.flush();
 
   initializeShield();
+  Serial.println("DEBUG: Shield initialized");
+  Serial.flush();
+  
   startWatchdog();
+  Serial.println("DEBUG: Watchdog started");
+  Serial.flush();
 
-  if (!Camera.begin(QVGA, RGB565, kCameraFps, OV7675)) {
+  if (!Camera.begin(QQVGA, GRAYSCALE, kCameraFps, OV7675)) {
     fatalBlink("ERROR: failed to initialize OV7675 camera");
   }
+  Serial.println("DEBUG: Camera initialized");
+  Serial.flush();
 
   if (Camera.width() != kFrameWidth || Camera.height() != kFrameHeight ||
       Camera.bytesPerPixel() != kBytesPerPixel) {
+    Serial.print("DEBUG: Camera geometry mismatch: w=");
+    Serial.print(Camera.width());
+    Serial.print(" h=");
+    Serial.print(Camera.height());
+    Serial.print(" bpp=");
+    Serial.println(Camera.bytesPerPixel());
     fatalBlink("ERROR: unexpected camera frame geometry");
   }
+  Serial.println("DEBUG: Camera geometry OK");
+  Serial.flush();
 
   applyAutoExposure();
+  Serial.println("DEBUG: Auto exposure applied");
+  Serial.flush();
+  
   warmupCamera(kAutoWarmupFrames);
+  Serial.println("DEBUG: Camera warmed up");
+  Serial.flush();
+  
   printReady();
 }
 
