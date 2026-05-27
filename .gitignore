@@ -1,0 +1,22 @@
+# Runtime / generated
+.live_view.pid
+output.png
+test_data.txt
+captures/
+logs/
+
+# Python
+.venv/
+scripts/__pycache__/
+**/__pycache__/
+*.pyc
+
+# Local machine paths (contains absolute /Users/... includes)
+compile_flags.txt
+nano_33/compile_flags.txt
+
+# IDE (local paths in c_cpp_properties.json)
+.vscode/
+
+# Cascade agent internals
+.agents/
