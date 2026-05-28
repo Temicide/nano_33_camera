@@ -4,6 +4,7 @@ output.png
 test_data.txt
 captures/
 logs/
+build/
 
 # Python
 .venv/

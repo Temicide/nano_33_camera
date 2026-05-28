@@ -1,0 +1,6 @@
+run_id,hypothesis,metric,status,flash_bytes,ram_bytes,flash_delta,ram_delta,notes
+run_001,H1/H3,compile_memory,pass,194560,71048,672,288,"Sampling lookup map, timing profile command, quiet continuous count; hardware FPS pending"
+run_002,H1/H2,hardware_fps,pass,194560,71048,672,288,"T profile: capture 459 ms, inference 863 ms, DSP 14 ms, NN 824 ms, post 1 ms, fps_est 0.76; D stream about 0.8 FPS"
+run_003,H4,camera_fps_10,rejected,194560,71048,672,288,"Compiled with no memory change, uploaded, but firmware did not respond to ? or T; reverted"
+run_004,H4,restore_camera_fps_5,pass,194560,71048,672,288,"Restored 5 FPS firmware; T profile: capture 397 ms, inference 863 ms, DSP 14 ms, NN 824 ms, post 1 ms, fps_est 0.79"
+run_005,H5/H6,single_shot_json,pass,195408,71048,1520,288,"Added J one-line JSON command and confidence filtering; 3 hardware trials parsed with totals 1254 ms, 1190 ms, 1190 ms"

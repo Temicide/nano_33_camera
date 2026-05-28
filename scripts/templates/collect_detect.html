@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Board Count Collector</title>
+  <style>
+    :root {
+      --bg: #121416;
+      --panel: #1b2024;
+      --panel-2: #242a2f;
+      --line: #3a4349;
+      --text: #f0f3f5;
+      --muted: #a5b0b8;
+      --accent: #6ee7b7;
+      --warn: #f4c96b;
+      --bad: #ff7070;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    main {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 24px 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 16px;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    .sub {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--bad);
+      box-shadow: 0 0 12px currentColor;
+    }
+
+    .dot.ok { background: var(--accent); }
+
+    .viewer {
+      border: 1px solid var(--line);
+      background: #050607;
+      min-height: 480px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .viewer img {
+      width: 100%;
+      height: auto;
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    aside {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    .metric {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-size: 13px;
+    }
+
+    .metric:last-child { border-bottom: 0; }
+    .metric span:first-child { color: var(--muted); }
+    .metric strong { color: var(--accent); font-size: 16px; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 10px 8px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: wait;
+    }
+
+    .primary {
+      background: #12372f;
+      border-color: #26715f;
+      color: var(--accent);
+    }
+
+    .wide { grid-column: span 2; }
+
+    .detections {
+      display: grid;
+      gap: 6px;
+      max-height: 220px;
+      overflow: auto;
+      font-size: 12px;
+    }
+
+    .det {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 8px;
+      background: rgba(110, 231, 183, 0.08);
+      border-left: 2px solid var(--accent);
+    }
+
+    .empty, .error, .last {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .error { color: var(--warn); }
+
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      header { align-items: start; flex-direction: column; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Board Count Collector</h1>
+        <div class="sub">Nano 33 detection stream saves raw PNG plus JSON count</div>
+      </div>
+      <div class="status"><span id="dot" class="dot"></span><span id="statusText">connecting</span></div>
+    </header>
+
+    <section class="viewer">
+      <img id="stream" src="/stream" alt="Live board detection stream">
+    </section>
+
+    <aside>
+      <section class="panel">
+        <div class="metric"><span>live count</span><strong id="liveCount">0</strong></div>
+        <div class="metric"><span>saved</span><strong id="savedCount">0</strong></div>
+        <div class="metric"><span>fps</span><strong id="fps">0.0</strong></div>
+        <div class="metric"><span>frame id</span><strong id="frameNum">0</strong></div>
+      </section>
+
+      <section class="panel controls">
+        <button id="captureBtn" onclick="capture()" class="primary wide">Capture PNG + JSON</button>
+        <button onclick="control('auto')">Auto Exp</button>
+        <button onclick="control('calibrated')">Cal Exp</button>
+        <button onclick="control('detect')">Detect</button>
+        <button onclick="control('stop')">Stop</button>
+      </section>
+
+      <section class="panel">
+        <div class="last" id="lastCapture">No capture saved yet.</div>
+      </section>
+
+      <section class="panel">
+        <div class="detections" id="detections">
+          <div class="empty">Waiting for board detections.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div id="error" class="error"></div>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    async function control(action) {
+      await fetch('/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
+    }
+
+    function fmt(n) {
+      return Number(n || 0).toFixed(1);
+    }
+
+    async function capture() {
+      const btn = document.getElementById('captureBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      try {
+        const res = await fetch('/capture', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'capture failed');
+        document.getElementById('savedCount').textContent = data.count;
+        document.getElementById('lastCapture').textContent =
+          `${data.filename} + ${data.json_filename} | pills ${data.pill_count} | frame ${data.frame_num}`;
+      } catch (err) {
+        alert('Capture failed: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Capture PNG + JSON';
+      }
+    }
+
+    async function refresh() {
+      try {
+        const res = await fetch('/stats');
+        const data = await res.json();
+        document.getElementById('dot').classList.toggle('ok', data.connected);
+        document.getElementById('statusText').textContent = data.connected ? 'serial online' : 'serial offline';
+        document.getElementById('liveCount').textContent = data.count;
+        document.getElementById('savedCount').textContent = data.captured;
+        document.getElementById('fps').textContent = fmt(data.fps);
+        document.getElementById('frameNum').textContent = data.frame_num;
+        document.getElementById('error').textContent = data.last_error || '';
+
+        if (data.last_capture) {
+          document.getElementById('lastCapture').textContent =
+            `${data.last_capture.filename} + ${data.last_capture.json_filename} | pills ${data.last_capture.pill_count} | frame ${data.last_capture.frame_num}`;
+        }
+
+        const list = document.getElementById('detections');
+        list.innerHTML = '';
+        if (!data.detections || data.detections.length === 0) {
+          list.innerHTML = '<div class="empty">No boxes over threshold.</div>';
+        } else {
+          for (const det of data.detections) {
+            const row = document.createElement('div');
+            row.className = 'det';
+            row.innerHTML = `<span>x${det.x} y${det.y} ${det.w}x${det.h}</span><strong>${det.confidence.toFixed(2)}</strong>`;
+            list.appendChild(row);
+          }
+        }
+      } catch (err) {
+        document.getElementById('statusText').textContent = 'web app offline';
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 500);
+  </script>
+</body>
+</html>

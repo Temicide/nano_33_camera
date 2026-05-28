@@ -1,128 +1,150 @@
-# Arduino Nano 33 in Cursor
+# nano_33 — Arduino Nano 33 BLE + OV7675 Camera
 
-Starter project for **Arduino Nano 33 BLE** or **Nano 33 IoT**, using `arduino-cli` from the terminal and the Arduino extension in Cursor.
+Arduino Nano 33 BLE project with OV7675 camera streaming and TinyML inference, using `arduino-cli` from the terminal.
 
-## One-time setup (already done on this machine)
+## Branches
 
-- `arduino-cli` installed via Homebrew
-- Board cores: `arduino:mbed_nano` (BLE), `arduino:samd` (IoT)
+| Branch           | What it does                                                            |
+| ---------------- | ----------------------------------------------------------------------- |
+| `main`           | Base setup — board toolchain, upload scripts, serial monitor            |
+| `grayscale`      | Live 160×120 grayscale camera stream over USB serial with Python viewer |
+| `counting_model` | Edge Impulse FOMO model — medicine counting inference on-device         |
 
-## 1. Install the Cursor extension
+---
 
-1. Open this folder in Cursor: `File → Open Folder → nano_33`
-2. When prompted, install **Arduino** (`vscode-arduino.vscode-arduino-community`)
-3. Reload the window if needed
+## Hardware
 
-## 2. Connect the board
+- **Arduino Nano 33 BLE** (nRF52840, Cortex-M4 @ 64 MHz, 256 KB RAM)
+- **Arduino TinyML Shield** with **OV7675 camera** (up to 640×480)
+- Data-capable USB cable (not charge-only)
 
-1. Plug the Nano 33 in with a **data** USB cable (not charge-only).
-2. List ports:
+---
+
+## One-time Setup
+
+### Arduino CLI
+
+```bash
+brew install arduino-cli
+arduino-cli core install arduino:mbed_nano
+arduino-cli lib install "Arduino_OV767x" "TinyMLShield"
+```
+
+### Python viewer (optional, needed for camera branches)
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install pyserial opencv-python numpy
+```
+
+---
+
+## Connect & Upload
+
+1. Plug the Nano 33 in with a **data** USB cable.
+2. Find your port:
 
 ```bash
 arduino-cli board list
+# or
+./scripts/port.sh
 ```
 
-3. Copy the port (e.g. `/dev/cu.usbmodem1101`) into `.vscode/settings.json` → `"arduino.port"`.
-
-### Pick your board (FQBN)
-
-| Board           | Set in `settings.json`                          |
-| --------------- | ----------------------------------------------- |
-| Nano 33 **BLE** | `"arduino.fqbn": "arduino:mbed_nano:nano33ble"` |
-| Nano 33 **IoT** | `"arduino.fqbn": "arduino:samd:nano_33_iot"`    |
-
-**BLE upload tip:** Double-tap the reset button quickly if upload fails — the board enters the bootloader and shows a new port.
-
-## 3. Build and upload
-
-**From Cursor:** `Terminal → Run Task…` → **Arduino: Upload** (default build task: `Cmd+Shift+B`).
-
-**From terminal:**
+3. Upload:
 
 ```bash
-# BLE (default)
 ./scripts/upload.sh
-
-# IoT
-FQBN=arduino:samd:nano_33_iot ./scripts/upload.sh
 
 # Explicit port
 PORT=/dev/cu.usbmodem1101 ./scripts/upload.sh
 ```
 
-**Serial monitor:**
+4. Serial monitor:
 
 ```bash
 ./scripts/monitor.sh
 ```
 
-The USB port name changes after upload or reset (e.g. `usbmodem314301` → `usbmodem114301`). If you see `command 'open' failed`, run `arduino-cli board list` and use the current port.
+**Upload tip (BLE):** If upload times out, double-tap the reset button — the board enters the bootloader and shows a new port. Re-run `board list` and update the port.
 
-Or run task **Arduino: Serial Monitor** (after setting `arduino.port`).
+---
 
-## Live Camera View
+## Edge Impulse Model
 
-The sketch streams OV7675 QCIF RGB565 frames from the TinyML Shield over USB serial.
+Install the exported Edge Impulse model, then upload:
 
 ```bash
+./scripts/ei_deploy.sh /Users/temicide/Downloads/pill-counting-cpp-mcu-v2-impulse-#1.zip
 ./scripts/upload.sh
-./scripts/live_view.sh
 ```
 
-The viewer auto-detects the Nano 33 BLE port, leaves the board in **auto** mode (sensor-side AGC/AEC/AWB), serves the live feed at `http://127.0.0.1:8765/`, opens it in your browser, and decodes RGB565 as big-endian. By default it also applies a host-side trimmed gray-world white balance to clean up any residual color cast.
+The deploy script accepts either the Arduino Library export or the C++ MCU export and installs it as `pill_counting_inferencing`. The sketch includes `pill_counting_inferencing.h`.
 
-For a native OpenCV window instead, run:
+Supported production profile:
+
+- Camera capture: **160x120 grayscale** (`QQVGA`, 19,200 bytes)
+- Model input: **96x96 grayscale int8**
+- Edge Impulse arena: target **<=120 KB**, rejected above **140 KB**
+- Upload builds define `EI_CLASSIFIER_ALLOCATION_STATIC` so tensor arena RAM is visible in the compile report instead of being hidden as a runtime heap allocation.
+
+Serial commands after upload:
+
+| Command | Action                    |
+| ------- | ------------------------- |
+| `J`     | Production single-shot JSON count |
+| `C`     | Capture one frame + count |
+| `M`     | Print memory diagnostics  |
+| `T`     | Print capture/inference timing profile |
+| `K`     | Continuous counting       |
+| `D`     | Live detection stream     |
+| `X`     | Stop continuous counting  |
+| `S`     | Start camera streaming    |
+| `P`     | Pause camera streaming    |
+
+Use `J` for the production workflow. It captures one 160x120 grayscale frame,
+runs the 96x96 FOMO model once, and returns one JSON line with `ok`, `count`,
+`boxes`, and `timing_ms`. It does not send image bytes.
+
+Run the browser-based bounding-box viewer after uploading the model firmware:
 
 ```bash
-./.venv/bin/python scripts/live_camera_view.py --port "$(./scripts/port.sh)"
+./scripts/detect_web.sh
 ```
 
-### Camera modes
+Open http://localhost:5050. The page displays the grayscale camera feed with `blister` boxes, count, FPS, and exposure controls.
 
-| Flag                    | Firmware command | Behavior                                                                      |
-| ----------------------- | ---------------- | ----------------------------------------------------------------------------- |
-| `--mode auto` (default) | `A`              | Sensor AGC/AEC + AWB run; SDE registers neutral                               |
-| `--mode face`           | `F`              | Hand-tuned manual exposure/gain/saturation for close faces; **freezes AWB**   |
-| `--mode stream`         | `S`              | Don't change mode; just start streaming whatever the firmware was last set to |
+---
 
-### Color pipeline flags
+## Scripts
 
-- `--no-white-balance` — disable host gray-world WB (raw sensor color).
-- `--enhance` — opt in to luminance/chroma post-processing (`--gamma`, `--gain`, `--brightness`, `--saturation`, `--clahe`). All enhancement defaults are 1.0/0/off, so passing `--enhance` alone is a no-op until you set values.
-- `--debug-color` — log per-channel BGR means and bias every `--debug-interval` frames; useful for confirming AWB convergence on a neutral target.
-- `--byte-order {big,little}` — only change if you swap to a sensor that ships RGB565 as little-endian. The OV7675 is big-endian.
+| Script                 | Purpose                                      |
+| ---------------------- | -------------------------------------------- |
+| `scripts/upload.sh`    | Compile and flash via `arduino-cli`          |
+| `scripts/monitor.sh`   | Open serial monitor at 921600 baud           |
+| `scripts/port.sh`      | Auto-detect and print the Nano 33 port       |
+| `scripts/live_view.sh` | Launch live camera viewer (grayscale branch) |
+| `scripts/live_detect.sh` | Launch model detection viewer with boxes   |
+| `scripts/detect_web.sh` | Launch browser detection app with boxes    |
 
-### White-balance calibration (software-only)
+---
 
-If `--mode auto` still leaves a cast under your specific lighting, capture a one-shot static WB:
+## Project Structure
 
-```bash
-mkdir -p captures
-./.venv/bin/python scripts/live_camera_view.py \
-    --mode auto --frames 60 --no-window \
-    --no-white-balance --no-wb-file \
-    --save-latest captures/wb_ref.png
-./.venv/bin/python scripts/calibrate_wb.py captures/wb_ref.png
+```
+nano_33/
+├── nano_33/nano_33.ino       # Main Arduino sketch
+├── scripts/                  # Shell + Python helper scripts
+├── docs/research/            # Research notes and design specs
+└── .gitignore
 ```
 
-`calibrate_wb.py` writes `~/.config/nano33_wb.json`. The live viewer auto-loads it on startup (override with `--wb-file`, disable with `--no-wb-file`). Re-run whenever lighting changes meaningfully.
-
-### Two RGB565 readers, two byte-order conventions
-
-- `scripts/live_camera_view.py` reads the **binary wire stream** and treats each pixel as big-endian uint16.
-- `scripts/4_2_12_ov7675imageviewer.py` reads `0xNNNN` **hex words** copied from the Arduino Serial Monitor and byte-swaps by default (the Serial Monitor prints word-order, not wire-order).
-
-Don't feed one script's input to the other.
-
-## Sketch
-
-Edit `nano_33/nano_33.ino` — streams OV7675 camera frames at 176x144 RGB565 over USB serial.
+---
 
 ## Troubleshooting
 
-| Issue                    | Fix                                                           |
-| ------------------------ | ------------------------------------------------------------- |
-| No port in `board list`  | Try another cable/port; install board USB driver if Windows   |
-| Upload timeout (BLE)     | Double-tap reset, re-run `board list`, update `arduino.port`  |
-| Wrong board selected     | Match FQBN to your hardware (BLE vs IoT)                      |
-| Extension can’t find CLI | `which arduino-cli` should be `/opt/homebrew/bin/arduino-cli` |
+| Issue                    | Fix                                                       |
+| ------------------------ | --------------------------------------------------------- |
+| No port in `board list`  | Try another cable; use a data-capable USB cable           |
+| Upload timeout (BLE)     | Double-tap reset button, re-run `board list`, update port |
+| Wrong board selected     | FQBN: `arduino:mbed_nano:nano33ble`                       |
+| Extension can't find CLI | `which arduino-cli` → `/opt/homebrew/bin/arduino-cli`     |

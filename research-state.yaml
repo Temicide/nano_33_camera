@@ -1,0 +1,114 @@
+project:
+  title: "Nano 33 BLE single-shot medicine counting"
+  question: "How can the Nano 33 BLE reliably return one JSON blister count from a triggered single-frame capture with high accuracy and acceptable latency?"
+  status: active
+  started: "2026-05-28"
+  domain: "embedded TinyML single-shot detection"
+
+literature:
+  key_papers: []
+  open_problems:
+    - "Validate count accuracy across fixed single-shot tray scenes before changing model or raw camera resolution."
+    - "Keep the production response to one JSON line with no image payload and no second full frame buffer."
+  evidence_gaps:
+    - "A 30-scene single-shot validation set is still needed to measure count accuracy."
+    - "The best fixed camera height, tray position, and exposure preset are not yet measured."
+
+hypotheses:
+  - id: H1
+    statement: "Precomputing the 96x96 model-to-camera sampling map will reduce per-pixel DSP callback overhead while adding less than 512 bytes of static RAM."
+    status: inconclusive
+    motivation: "The callback previously performed division/modulo and source-coordinate calculations for each model input pixel."
+    parent: null
+    priority: medium
+  - id: H2
+    statement: "For live detection, serial transfer of a full 160x120 frame is likely the dominant FPS ceiling after model inference."
+    status: refuted_current_model
+    motivation: "Each detection packet sends about 19.2 KB of image data plus headers and boxes over USB serial."
+    parent: null
+    priority: low
+  - id: H3
+    statement: "Suppressing per-detection text output in continuous count mode will improve count-loop FPS without increasing RAM."
+    status: implemented
+    motivation: "Serial text printing competes with capture and inference time and is unnecessary for continuous count updates."
+    parent: null
+    priority: low
+  - id: H4
+    statement: "Raising camera init FPS from 5 to 10 will reduce capture latency without changing RAM."
+    status: refuted_current_board
+    motivation: "The measured capture stage is hundreds of milliseconds, so camera timing looked like a no-RAM optimization target."
+    parent: null
+    priority: low
+  - id: H5
+    statement: "A production J command can return one parseable JSON line per trigger without adding RAM or image payload."
+    status: supported_initial
+    motivation: "The task is single-shot counting, so production needs a compact machine-readable result rather than live streaming FPS."
+    parent: null
+    priority: high
+  - id: H6
+    statement: "Filtering detections by label and confidence will prevent zero-score FOMO boxes from corrupting counts."
+    status: supported_initial
+    motivation: "Initial hardware JSON testing counted a blister-labeled box with score 0.00 when the firmware filtered by label only."
+    parent: H5
+    priority: high
+  - id: H7
+    statement: "Physical setup improvements will improve effective resolution more safely than increasing raw camera resolution."
+    status: planned
+    motivation: "The model input remains 96x96, so camera distance, tray alignment, lighting, and crop quality should be validated before changing capture resolution."
+    parent: null
+    priority: high
+
+experiments:
+  proxy_metric: "Primary: count accuracy across fixed single-shot validation scenes. Secondary: trigger-to-JSON total latency."
+  baseline_value: null
+  best_value: null
+  total_runs: 5
+  trajectory:
+    - run_id: "run_001"
+      hypothesis: "H1/H3"
+      metric_value: null
+      delta: "+288 bytes RAM, +672 bytes flash at compile time; hardware FPS pending"
+      wall_time_min: 25
+      change_summary: "Added model sampling lookup tables, reduced continuous-count serial chatter, and added T profile command."
+      timestamp: "2026-05-28T02:41:26+07:00"
+    - run_id: "run_002"
+      hypothesis: "H1/H2"
+      metric_value: 0.8
+      delta: "Hardware profile: capture 459 ms, infer 863 ms, DSP 14 ms, NN 824 ms, post 1 ms; live detection about 0.8 FPS."
+      wall_time_min: 10
+      change_summary: "Uploaded firmware, ran T profile command, and measured 5-frame detection stream."
+      timestamp: "2026-05-28T02:50:00+07:00"
+    - run_id: "run_003"
+      hypothesis: "H4"
+      metric_value: null
+      delta: "10 FPS camera init compiled with no memory change but firmware did not respond to ? or T after upload."
+      wall_time_min: 15
+      change_summary: "Tested kCameraFps=10; rejected as unsafe on this board/library combination."
+      timestamp: "2026-05-28T03:00:00+07:00"
+    - run_id: "run_004"
+      hypothesis: "H4"
+      metric_value: 0.79
+      delta: "Restored kCameraFps=5; final T profile capture 397 ms, inference 863 ms, DSP 14 ms, NN 824 ms, post 1 ms."
+      wall_time_min: 10
+      change_summary: "Restored known-responsive firmware and verified board response."
+      timestamp: "2026-05-28T03:05:00+07:00"
+    - run_id: "run_005"
+      hypothesis: "H5/H6"
+      metric_value: null
+      delta: "J command returned parseable one-line JSON in three hardware trials; totals 1254 ms, 1190 ms, and 1190 ms. Compile RAM unchanged at 71048 bytes; flash 195408 bytes."
+      wall_time_min: 30
+      change_summary: "Added production single-shot JSON command, shared frame-coordinate box mapping, JSON escaping, timing output, and confidence threshold filtering."
+      timestamp: "2026-05-28T03:16:54+07:00"
+
+outer_loop:
+  cycle: 3
+  last_direction: deepen
+  last_reflection: "The project direction has pivoted from live FPS optimization to production single-shot JSON counting. Keep 160x120 capture, 96x96 FOMO input, and 5 FPS camera init; validate count accuracy through physical setup, exposure, crop, and only then consider retraining."
+
+workspace:
+  findings: "findings.md"
+  log: "research-log.md"
+  literature_dir: "literature/"
+  experiments_dir: "experiments/"
+  to_human_dir: "to_human/"
+  paper_dir: "paper/"

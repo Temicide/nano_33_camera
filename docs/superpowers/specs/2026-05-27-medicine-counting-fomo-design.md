@@ -28,7 +28,7 @@ The existing `nano_33/nano_33.ino` streaming firmware is extended with an infere
 - Feeds the 96×96 buffer to `ei_run_classifier()` from the deployed Edge Impulse Arduino library
 - Iterates returned FOMO bounding boxes (centroids)
 - Counts boxes where `label == "blister"` and `value >= 0.5`
-- Outputs count via Serial: `COUNT: <N>`
+- Outputs either debug text via `C` or production JSON via `J`
 
 ### Mode Transitions
 
@@ -38,6 +38,7 @@ Power on → Idle (paused)
     ├── S → Streaming mode (data collection)
     ├── P → Pause streaming
     ├── C → Single capture + count (one-shot)
+    ├── J → Single capture + JSON count (production)
     ├── K → Continuous counting loop
     └── X → Stop continuous counting → Idle
 ```
@@ -53,6 +54,7 @@ The existing firmware uses case-insensitive commands. To add counting without br
 | `S` / `s` | Start streaming frames | `STREAMING` |
 | `P` / `p` | Pause streaming | `PAUSED` |
 | `C` | Capture one frame, run inference, output count | `COUNT: <N>` followed by per-detection lines |
+| `J` / `j` | Capture one frame, run inference, output production JSON | One JSON object line |
 | `K` / `k` | Enter continuous counting (capture + infer loop) | `COUNTING` then `COUNT: <N>` each cycle |
 | `X` / `x` | Exit continuous counting | `STOPPED` |
 | `F` / `f` | Apply face exposure preset | `FACE_EXPOSURE` |
@@ -69,13 +71,7 @@ OV7675 sensor (160×120 grayscale, QQVGA)
 g_frame[] (19,200 bytes)
     │
     ▼
-Center-crop to 96×96:
-  - x_offset = (160 - 96) / 2 = 32
-  - y_offset = (120 - 96) / 2 = 12
-  - Copy 96 bytes per row, 96 rows, from g_frame into ei_frame[]
-    │
-    ▼
-ei_frame[] (9,216 bytes, 96×96 grayscale)
+signal_t callback samples the model crop directly from g_frame[]
     │
     ▼
 signal_t + ei_run_classifier()
@@ -87,26 +83,39 @@ ei_impulse_result_t with bounding_boxes[]
 Count boxes: label == "blister" && value >= 0.5f
     │
     ▼
-Serial.println("COUNT: <N>")
+Serial.println("COUNT: <N>") for debug, or one JSON line for production
 ```
 
-### Center-Crop Implementation
+### Production JSON (`J` command)
 
-```cpp
-constexpr uint16_t kInferWidth = 96;
-constexpr uint16_t kInferHeight = 96;
-constexpr uint16_t kCropX = (kFrameWidth - kInferWidth) / 2;   // 32
-constexpr uint16_t kCropY = (kFrameHeight - kInferHeight) / 2; // 12
+The production command returns exactly one JSON object line and no image bytes:
 
-static uint8_t g_ei_frame[kInferWidth * kInferHeight];
+```json
+{
+  "ok": true,
+  "count": 4,
+  "boxes": [
+    { "label": "blister", "x": 52, "y": 31, "w": 16, "h": 16, "score": 0.91 }
+  ],
+  "timing_ms": {
+    "capture": 420,
+    "inference": 860,
+    "total": 1280
+  }
+}
+```
 
-void cropFrame() {
-  for (uint16_t y = 0; y < kInferHeight; ++y) {
-    memcpy(
-      &g_ei_frame[y * kInferWidth],
-      &g_frame[(y + kCropY) * kFrameWidth + kCropX],
-      kInferWidth
-    );
+Error responses keep the same one-line JSON contract:
+
+```json
+{
+  "ok": false,
+  "error": "INFERENCE_ERROR",
+  "code": -1,
+  "timing_ms": {
+    "capture": 420,
+    "inference": 0,
+    "total": 420
   }
 }
 ```
@@ -116,12 +125,12 @@ void cropFrame() {
 | Allocation | Size | Notes |
 |------------|------|-------|
 | `g_frame[]` (streaming buffer) | 19,200 bytes | 160×120×1, always allocated |
-| `g_ei_frame[]` (inference buffer) | 9,216 bytes | 96×96×1, always allocated |
+| Sampling lookup tables | 288 bytes | Source X and row-offset maps for 96×96 model reads |
 | FOMO MobileNetV2 0.35 total inference | ~245 KB | Tensor arena + model temps + weights in SRAM |
 | Mbed OS + BLE stack | ~80 KB | System overhead |
-| **Total SRAM peak** | **~254 KB** | At 256 KB ceiling — tight but fits |
+| **Sketch global dynamic memory** | ~71 KB | Compile-time global/static use outside runtime heap/stack |
 
-FOMO MobileNetV2 0.35 is the lightest FOMO variant and is specifically designed for the Nano 33 BLE's 256 KB SRAM. The ~245 KB inference peak includes the tensor arena, intermediate buffers, and model weights loaded into SRAM during inference. The streaming buffer (19.2 KB) and inference buffer (9.2 KB) are statically allocated and coexist with inference overhead. During counting mode, streaming is paused — no additional frame copies are made.
+FOMO MobileNetV2 0.35 is designed for small MCU deployments. The firmware keeps one 160×120 frame buffer and does not allocate a second full inference image buffer. During counting mode, streaming is paused.
 
 If memory is too tight at compile time, the fallback is to use FOMO MobileNetV2 0.1 alpha (smaller, faster, slightly less accurate).
 
@@ -152,14 +161,11 @@ int countDetections(const ei_impulse_result_t &result) {
 
 ### Signal Callback
 
-The Edge Impulse classifier reads pixel data through a `signal_t` callback. This callback serves pixels from `g_ei_frame[]` (the cropped 96×96 buffer):
+The Edge Impulse classifier reads pixel data through a `signal_t` callback. The current firmware samples directly from `g_frame[]` using precomputed source-column and row-offset lookup tables, so it avoids a second 96×96 image buffer:
 
 ```cpp
 int ei_get_frame_data(size_t offset, size_t length, float *out_ptr) {
-  const uint8_t *buf = g_ei_frame + offset;
-  for (size_t i = 0; i < length; ++i) {
-    out_ptr[i] = static_cast<float>(buf[i]);
-  }
+  // Samples the 96x96 model view from the 160x120 camera frame.
   return 0;
 }
 ```
@@ -169,10 +175,9 @@ int ei_get_frame_data(size_t offset, size_t length, float *out_ptr) {
 ```cpp
 void doSingleCount() {
   Camera.readFrame(g_frame);
-  cropFrame();
 
   signal_t signal;
-  signal.total_length = kInferWidth * kInferHeight;
+  signal.total_length = EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE;
   signal.get_data = &ei_get_frame_data;
 
   ei_impulse_result_t result;
@@ -188,6 +193,10 @@ void doSingleCount() {
   Serial.println(count);
 }
 ```
+
+### Production JSON Count (`J` command)
+
+`J` uses the same capture and inference path as `C`, but writes a single JSON object line. It is the command production integrations should call.
 
 ### Continuous Count (`K` command)
 
@@ -280,7 +289,7 @@ Target: training accuracy >90%, validation accuracy >85%.
 | Limitation | Impact | Mitigation |
 |------------|--------|------------|
 | FOMO cannot resolve heavy overlap | Undercounting when squares overlap | Arrange squares with gaps on tray |
-| 96×96 resolution | Small or distant objects may be missed | Fixed camera height ~10–15 cm |
+| 96×96 model input | Small or distant objects may be missed | Fixed camera height, fixed tray, diffuse lighting, tight centered view |
 | Grayscale only | Cannot distinguish pills by color | Not needed — counting squares, not pill types |
 | No persistent storage | Count lost on power-off | Send count via Serial (or BLE in future) |
 | FOMO has no inter-frame memory | Not relevant for static tray counting | One-shot count per command |
@@ -297,6 +306,6 @@ Target: training accuracy >90%, validation accuracy >85%.
 
 | File | Change |
 |------|--------|
-| `nano_33/nano_33.ino` | Add counting mode, inference pipeline, serial commands `C`, `K`, `X`. Remap calibrated exposure to lowercase `c`. |
+| `nano_33/nano_33.ino` | Add counting mode, inference pipeline, serial commands `C`, `J`, `K`, `X`. Remap calibrated exposure to lowercase `c`. |
 
 No new files are created. The Edge Impulse model library is added via Arduino IDE's library manager after deployment.
