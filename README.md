@@ -22,6 +22,9 @@ nano_33/
 
 Generated files such as `build/`, `captures/`, `logs/`, `.venv/`, and `compile_flags.txt` are intentionally ignored.
 
+For a deeper explanation of the firmware, serial protocol, host tools, and data
+flow, see [docs/architecture.md](docs/architecture.md).
+
 ## Setup
 
 Install the Arduino toolchain and board support:

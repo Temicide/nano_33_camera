@@ -5,6 +5,7 @@ test_data.txt
 captures/
 logs/
 build/
+.understand-anything/
 
 # Python
 .venv/

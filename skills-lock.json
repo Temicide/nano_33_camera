@@ -1,17 +1,113 @@
 {
   "version": 1,
   "skills": {
+    "architecture-blueprint-generator": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/architecture-blueprint-generator/SKILL.md",
+      "computedHash": "9b20f13d1d96ba1c2550e1ce535f932e943c42939d3fae906a9e0d6c1bfb471a"
+    },
+    "code-tour": {
+      "source": "affaan-m/everything-claude-code",
+      "sourceType": "github",
+      "skillPath": "skills/code-tour/SKILL.md",
+      "computedHash": "70688a93455d33eaa06d42414cc35b218fc5bf8a264ffbf41edec0f716517a2e"
+    },
+    "codebase-documenter": {
+      "source": "ailabs-393/ai-labs-claude-skills",
+      "sourceType": "github",
+      "skillPath": "packages/skills/codebase-documenter/SKILL.md",
+      "computedHash": "42f8267717c269dd643a1e3c179ffdab09783bd10469deea83852dda8a1b22cd"
+    },
+    "codebase-onboarding": {
+      "source": "affaan-m/everything-claude-code",
+      "sourceType": "github",
+      "skillPath": "skills/codebase-onboarding/SKILL.md",
+      "computedHash": "ab347207dc6d26c7489ba382aa25a1430c7d07321c75dbe69f2617f33ea3c893"
+    },
+    "codebase-study-guide": {
+      "source": "petekp/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/codebase-study-guide/SKILL.md",
+      "computedHash": "d29863c228f162c41ccc49726a31358c9654c9f4982dd1c415767381f77686c3"
+    },
+    "codebase-to-course": {
+      "source": "zarazhangrui/codebase-to-course",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "3e3e7ff3976d392df02b1f5669223daa6564b0da8048d484346dc005829f6c52"
+    },
     "embedded-systems": {
       "source": "jeffallan/claude-skills",
       "sourceType": "github",
       "skillPath": "skills/embedded-systems/SKILL.md",
       "computedHash": "1631345781a5ed3ba2a780a710b8c23cb1b0abaaf576164c40d15b20683d2f6e"
     },
+    "mcp-deepwiki": {
+      "source": "aahl/skills",
+      "sourceType": "github",
+      "skillPath": "skills/mcp-deepwiki/SKILL.md",
+      "computedHash": "315ada9e37b494aa7aef44ba0a80d859c4105a9a030c6988fae205853a8230c5"
+    },
     "systematic-debugging": {
       "source": "obra/superpowers",
       "sourceType": "github",
       "skillPath": "skills/systematic-debugging/SKILL.md",
       "computedHash": "7246fdd3a795fc3daff0af72044ca99bf836e4e6a46844742858786fdfb86488"
+    },
+    "understand": {
+      "source": "Lum1104/Understand-Anything",
+      "sourceType": "github",
+      "skillPath": "understand-anything-plugin/skills/understand/SKILL.md",
+      "computedHash": "1b4d5289539a4b3b0acb8f82c6ced6d81b41d9c0d71af6769c733f8d6c731dba"
+    },
+    "understand-anything-knowledge-graph": {
+      "source": "aradotso/trending-skills",
+      "sourceType": "github",
+      "skillPath": "skills/understand-anything-knowledge-graph/SKILL.md",
+      "computedHash": "f9534ff5617d2899d308c9f3ecb6d1912c7c3710c61130e0888334e039eb86c6"
+    },
+    "understand-chat": {
+      "source": "Lum1104/Understand-Anything",
+      "sourceType": "github",
+      "skillPath": "understand-anything-plugin/skills/understand-chat/SKILL.md",
+      "computedHash": "3cec7cc6b02177b29d359c3889e311a3985314c61ef7a654ed6c22d43e44b080"
+    },
+    "understand-dashboard": {
+      "source": "Lum1104/Understand-Anything",
+      "sourceType": "github",
+      "skillPath": "understand-anything-plugin/skills/understand-dashboard/SKILL.md",
+      "computedHash": "32771fb738e732febba2c780df113354fdc08085aee73e6531ded3e0ad17ee29"
+    },
+    "understand-diff": {
+      "source": "Lum1104/Understand-Anything",
+      "sourceType": "github",
+      "skillPath": "understand-anything-plugin/skills/understand-diff/SKILL.md",
+      "computedHash": "e258781324eaab144a9340c32ea2a49f7584ec7b5984121e11dcffe16fbee03c"
+    },
+    "understand-domain": {
+      "source": "Lum1104/Understand-Anything",
+      "sourceType": "github",
+      "skillPath": "understand-anything-plugin/skills/understand-domain/SKILL.md",
+      "computedHash": "493ad301cd52ddc35f883dd990db0ea683abf84d8bae893da38707c35a22fe0c"
+    },
+    "understand-explain": {
+      "source": "Lum1104/Understand-Anything",
+      "sourceType": "github",
+      "skillPath": "understand-anything-plugin/skills/understand-explain/SKILL.md",
+      "computedHash": "8f6ef8bc8d4be5e0e8dd764c0d4c5a42b95fa47191e22edbb5ccc351828af7b6"
+    },
+    "understand-knowledge": {
+      "source": "Lum1104/Understand-Anything",
+      "sourceType": "github",
+      "skillPath": "understand-anything-plugin/skills/understand-knowledge/SKILL.md",
+      "computedHash": "91643a1d1c6657229ac9f93511cd155dcffed4ebc4647e51962dacf69905c990"
+    },
+    "understand-onboard": {
+      "source": "Lum1104/Understand-Anything",
+      "sourceType": "github",
+      "skillPath": "understand-anything-plugin/skills/understand-onboard/SKILL.md",
+      "computedHash": "f486302a95dd1e871c5f1ac1dba1d87b8b40e61802fffedead5d203676fdc771"
     }
   }
 }

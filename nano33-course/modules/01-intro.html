@@ -1,0 +1,123 @@
+<section class="module" id="module-1">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">What this little counter actually does</h1>
+      <p class="module-subtitle">Imagine a document scanner at a pharmacy counter: a camera sees the blister pack, a tiny model finds each pill cell, and the board reports the count over USB.</p>
+    </header>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Start from the thing you can see</h2>
+      <p>The project turns an Arduino Nano 33 BLE and OV7675 camera into a small medicine blister counter. The key trick is that the <span class="term" data-definition="Firmware is the program running directly on a physical device, like an Arduino. When you ask AI to change device behavior, say firmware, not app code.">firmware</span> runs the camera capture and the <span class="term" data-definition="Inference means asking a trained model to make a prediction on new input. Here, the model looks at a camera frame and predicts blister boxes.">inference</span> on the board itself.</p>
+      <div class="pattern-cards stagger-children">
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+          <div class="pattern-icon" style="background: var(--color-actor-1)">1</div>
+          <h4 class="pattern-title">Camera frame</h4>
+          <p class="pattern-desc">The OV7675 produces a 160x120 grayscale picture, small enough for microcontroller RAM.</p>
+        </div>
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+          <div class="pattern-icon" style="background: var(--color-actor-2)">2</div>
+          <h4 class="pattern-title">Model input</h4>
+          <p class="pattern-desc">The frame is center-cropped and downsampled to the Edge Impulse model size: 96x96.</p>
+        </div>
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+          <div class="pattern-icon" style="background: var(--color-actor-5)">3</div>
+          <h4 class="pattern-title">Serial result</h4>
+          <p class="pattern-desc">USB serial sends raw frames, detection packets, or JSON count results to the laptop.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The main journey: send J, get a count</h2>
+      <p>Think of the command as a ticket number at a service desk. The laptop sends one letter, and the board runs a complete capture-count-report cycle.</p>
+      <div class="flow-animation" data-steps='[
+        {"highlight":"flow-actor-1","label":"A laptop sends command J over USB serial"},
+        {"highlight":"flow-actor-2","label":"The firmware stops streaming and captures one grayscale frame","packet":true,"from":"actor-1","to":"actor-2"},
+        {"highlight":"flow-actor-3","label":"Edge Impulse searches the frame for blister boxes","packet":true,"from":"actor-2","to":"actor-3"},
+        {"highlight":"flow-actor-4","label":"The firmware prints JSON with count, boxes, and timing","packet":true,"from":"actor-3","to":"actor-4"}
+      ]'>
+        <div class="flow-actors">
+          <div class="flow-actor" id="flow-actor-1">
+            <div class="flow-actor-icon">PC</div>
+            <span>Laptop</span>
+          </div>
+          <div class="flow-actor" id="flow-actor-2">
+            <div class="flow-actor-icon">FW</div>
+            <span>Firmware</span>
+          </div>
+          <div class="flow-actor" id="flow-actor-3">
+            <div class="flow-actor-icon">EI</div>
+            <span>Model</span>
+          </div>
+          <div class="flow-actor" id="flow-actor-4">
+            <div class="flow-actor-icon">JS</div>
+            <span>JSON</span>
+          </div>
+        </div>
+        <div class="flow-packet" id="flow-packet"></div>
+        <div class="flow-step-label" id="flow-label">Click "Next Step" to begin</div>
+        <div class="flow-controls">
+          <button class="btn flow-next-btn">Next Step</button>
+          <button class="btn flow-reset-btn">Restart</button>
+          <span class="flow-progress"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The code behind the production count</h2>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">void doJsonCount() {</span>
+<span class="code-line">  const uint32_t captureStartMs = millis();</span>
+<span class="code-line">  Camera.readFrame(g_frame);</span>
+<span class="code-line">  const uint32_t captureMs = millis() - captureStartMs;</span>
+<span class="code-line"></span>
+<span class="code-line">  ei_impulse_result_t result;</span>
+<span class="code-line">  const uint32_t inferStartMs = millis();</span>
+<span class="code-line">  EI_IMPULSE_ERROR err = runInference(result);</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">Start the production-style count function.</p>
+            <p class="tl">Write down the current clock time before capture starts.</p>
+            <p class="tl">Ask the camera to fill the global frame buffer with pixels.</p>
+            <p class="tl">Calculate how many milliseconds capture took.</p>
+            <p class="tl">Prepare a result box where Edge Impulse can write predictions.</p>
+            <p class="tl">Start another timer, then run the model on the frame.</p>
+          </div>
+        </div>
+      </div>
+      <div class="callout callout-accent">
+        <div class="callout-icon">i</div>
+        <div class="callout-content">
+          <strong class="callout-title">Key Insight</strong>
+          <p>Good embedded code often measures itself. When you ask AI to optimize this project, ask it to preserve timing output so you can tell whether the change helped.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Check your steering instinct</h2>
+      <div class="quiz-container" id="quiz-module1">
+        <div class="quiz-question-block"
+             data-correct="option-b"
+             data-explanation-right="The J path runs a single capture and returns structured JSON, so it is the stable production check."
+             data-explanation-wrong="Streaming views are useful for watching behavior, but a repeatable count check should use the single-shot JSON path.">
+          <h3 class="quiz-question">You ask AI to add a pass/fail check for pill count accuracy. Which command path should it build around first?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="option-a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>S, because raw streaming shows every frame</span></button>
+            <button class="quiz-option" data-value="option-b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>J, because it returns one JSON count result</span></button>
+            <button class="quiz-option" data-value="option-c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>F, because exposure affects brightness</span></button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+        <button class="quiz-check-btn" onclick="checkQuiz('quiz-module1')">Check Answer</button>
+        <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module1')">Try Again</button>
+      </div>
+    </div>
+  </div>
+</section>

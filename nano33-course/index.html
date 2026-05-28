@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nano 33 Medicine Counting Course</title>
+
+  <!-- Google Fonts: Bricolage Grotesque · DM Sans · JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+
+  <style>
+    :root {
+      --color-accent:       #2A7B9B;
+      --color-accent-hover: #1F6280;
+      --color-accent-light: #E4F2F7;
+      --color-accent-muted: #5A9DB8;
+    }
+  </style>
+
+  <script src="main.js" defer></script>
+</head>
+<body>
+
+  <nav class="nav" id="nav">
+    <div class="progress-bar" id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+    <div class="nav-inner">
+      <span class="nav-title">Nano 33 Medicine Counting Course</span>
+      <div class="nav-dots" id="nav-dots" role="tablist">
+        <button class="nav-dot" data-target="module-1" data-tooltip="What the device does" role="tab" aria-label="Module 1: What the device does"></button>
+        <button class="nav-dot" data-target="module-2" data-tooltip="Meet the actors" role="tab" aria-label="Module 2: Meet the actors"></button>
+        <button class="nav-dot" data-target="module-3" data-tooltip="Serial data flow" role="tab" aria-label="Module 3: Serial data flow"></button>
+        <button class="nav-dot" data-target="module-4" data-tooltip="The model pipeline" role="tab" aria-label="Module 4: The model pipeline"></button>
+        <button class="nav-dot" data-target="module-5" data-tooltip="Debugging the system" role="tab" aria-label="Module 5: Debugging the system"></button>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <!-- modules/*.html content is assembled here by build.sh -->
+<section class="module" id="module-1">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">What this little counter actually does</h1>
+      <p class="module-subtitle">Imagine a document scanner at a pharmacy counter: a camera sees the blister pack, a tiny model finds each pill cell, and the board reports the count over USB.</p>
+    </header>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Start from the thing you can see</h2>
+      <p>The project turns an Arduino Nano 33 BLE and OV7675 camera into a small medicine blister counter. The key trick is that the <span class="term" data-definition="Firmware is the program running directly on a physical device, like an Arduino. When you ask AI to change device behavior, say firmware, not app code.">firmware</span> runs the camera capture and the <span class="term" data-definition="Inference means asking a trained model to make a prediction on new input. Here, the model looks at a camera frame and predicts blister boxes.">inference</span> on the board itself.</p>
+      <div class="pattern-cards stagger-children">
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+          <div class="pattern-icon" style="background: var(--color-actor-1)">1</div>
+          <h4 class="pattern-title">Camera frame</h4>
+          <p class="pattern-desc">The OV7675 produces a 160x120 grayscale picture, small enough for microcontroller RAM.</p>
+        </div>
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+          <div class="pattern-icon" style="background: var(--color-actor-2)">2</div>
+          <h4 class="pattern-title">Model input</h4>
+          <p class="pattern-desc">The frame is center-cropped and downsampled to the Edge Impulse model size: 96x96.</p>
+        </div>
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+          <div class="pattern-icon" style="background: var(--color-actor-5)">3</div>
+          <h4 class="pattern-title">Serial result</h4>
+          <p class="pattern-desc">USB serial sends raw frames, detection packets, or JSON count results to the laptop.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The main journey: send J, get a count</h2>
+      <p>Think of the command as a ticket number at a service desk. The laptop sends one letter, and the board runs a complete capture-count-report cycle.</p>
+      <div class="flow-animation" data-steps='[
+        {"highlight":"flow-actor-1","label":"A laptop sends command J over USB serial"},
+        {"highlight":"flow-actor-2","label":"The firmware stops streaming and captures one grayscale frame","packet":true,"from":"actor-1","to":"actor-2"},
+        {"highlight":"flow-actor-3","label":"Edge Impulse searches the frame for blister boxes","packet":true,"from":"actor-2","to":"actor-3"},
+        {"highlight":"flow-actor-4","label":"The firmware prints JSON with count, boxes, and timing","packet":true,"from":"actor-3","to":"actor-4"}
+      ]'>
+        <div class="flow-actors">
+          <div class="flow-actor" id="flow-actor-1">
+            <div class="flow-actor-icon">PC</div>
+            <span>Laptop</span>
+          </div>
+          <div class="flow-actor" id="flow-actor-2">
+            <div class="flow-actor-icon">FW</div>
+            <span>Firmware</span>
+          </div>
+          <div class="flow-actor" id="flow-actor-3">
+            <div class="flow-actor-icon">EI</div>
+            <span>Model</span>
+          </div>
+          <div class="flow-actor" id="flow-actor-4">
+            <div class="flow-actor-icon">JS</div>
+            <span>JSON</span>
+          </div>
+        </div>
+        <div class="flow-packet" id="flow-packet"></div>
+        <div class="flow-step-label" id="flow-label">Click "Next Step" to begin</div>
+        <div class="flow-controls">
+          <button class="btn flow-next-btn">Next Step</button>
+          <button class="btn flow-reset-btn">Restart</button>
+          <span class="flow-progress"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The code behind the production count</h2>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">void doJsonCount() {</span>
+<span class="code-line">  const uint32_t captureStartMs = millis();</span>
+<span class="code-line">  Camera.readFrame(g_frame);</span>
+<span class="code-line">  const uint32_t captureMs = millis() - captureStartMs;</span>
+<span class="code-line"></span>
+<span class="code-line">  ei_impulse_result_t result;</span>
+<span class="code-line">  const uint32_t inferStartMs = millis();</span>
+<span class="code-line">  EI_IMPULSE_ERROR err = runInference(result);</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">Start the production-style count function.</p>
+            <p class="tl">Write down the current clock time before capture starts.</p>
+            <p class="tl">Ask the camera to fill the global frame buffer with pixels.</p>
+            <p class="tl">Calculate how many milliseconds capture took.</p>
+            <p class="tl">Prepare a result box where Edge Impulse can write predictions.</p>
+            <p class="tl">Start another timer, then run the model on the frame.</p>
+          </div>
+        </div>
+      </div>
+      <div class="callout callout-accent">
+        <div class="callout-icon">i</div>
+        <div class="callout-content">
+          <strong class="callout-title">Key Insight</strong>
+          <p>Good embedded code often measures itself. When you ask AI to optimize this project, ask it to preserve timing output so you can tell whether the change helped.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Check your steering instinct</h2>
+      <div class="quiz-container" id="quiz-module1">
+        <div class="quiz-question-block"
+             data-correct="option-b"
+             data-explanation-right="The J path runs a single capture and returns structured JSON, so it is the stable production check."
+             data-explanation-wrong="Streaming views are useful for watching behavior, but a repeatable count check should use the single-shot JSON path.">
+          <h3 class="quiz-question">You ask AI to add a pass/fail check for pill count accuracy. Which command path should it build around first?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="option-a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>S, because raw streaming shows every frame</span></button>
+            <button class="quiz-option" data-value="option-b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>J, because it returns one JSON count result</span></button>
+            <button class="quiz-option" data-value="option-c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>F, because exposure affects brightness</span></button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+        <button class="quiz-check-btn" onclick="checkQuiz('quiz-module1')">Check Answer</button>
+        <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module1')">Try Again</button>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="module" id="module-2">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">02</span>
+      <h1 class="module-title">Meet the actors</h1>
+      <p class="module-subtitle">A hardware project is like a stage crew: several specialists work together, and each one should own a clear job.</p>
+    </header>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The project is split by responsibility</h2>
+      <p>A <span class="term" data-definition="A module is a file or group of files that owns one part of the job. Telling AI which module should change prevents broad, messy edits.">module</span> should be easy to describe in one sentence. This repository mostly follows that rule: firmware talks to hardware, scripts talk to the board, and docs store evidence.</p>
+      <div class="file-tree animate-in">
+        <div class="ft-folder">
+          <span class="ft-name">nano_33</span><span class="ft-desc">the board program</span>
+          <div class="ft-children">
+            <div class="ft-file"><span class="ft-name">nano_33.ino</span><span class="ft-desc">camera, inference, serial protocol</span></div>
+          </div>
+        </div>
+        <div class="ft-folder">
+          <span class="ft-name">scripts</span><span class="ft-desc">laptop-side helpers</span>
+          <div class="ft-children">
+            <div class="ft-file"><span class="ft-name">detect_web.py</span><span class="ft-desc">Flask browser viewer</span></div>
+            <div class="ft-file"><span class="ft-name">live_camera_view.py</span><span class="ft-desc">OpenCV live view</span></div>
+            <div class="ft-file"><span class="ft-name">upload.sh</span><span class="ft-desc">compile, RAM guard, upload</span></div>
+          </div>
+        </div>
+        <div class="ft-folder">
+          <span class="ft-name">docs</span><span class="ft-desc">training data and research notes</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">What they say to each other</h2>
+      <p>A serial project is easiest to understand as a group chat. The laptop only sends tiny command messages; the board decides what each command means.</p>
+      <div class="chat-window" id="chat-module2">
+        <div class="chat-messages">
+          <div class="chat-message" data-msg="0" data-sender="viewer" style="display:none">
+            <div class="chat-avatar" style="background: var(--color-actor-2)">V</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-2)">Viewer</span>
+              <p>I need live detections for the browser. Sending D.</p>
+            </div>
+          </div>
+          <div class="chat-message" data-msg="1" data-sender="firmware" style="display:none">
+            <div class="chat-avatar" style="background: var(--color-actor-1)">F</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-1)">Firmware</span>
+              <p>Switching out of raw stream and count mode. Detection mode is on.</p>
+            </div>
+          </div>
+          <div class="chat-message" data-msg="2" data-sender="model" style="display:none">
+            <div class="chat-avatar" style="background: var(--color-actor-3)">M</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-3)">Model</span>
+              <p>I found blister boxes above the confidence threshold.</p>
+            </div>
+          </div>
+          <div class="chat-message" data-msg="3" data-sender="firmware" style="display:none">
+            <div class="chat-avatar" style="background: var(--color-actor-1)">F</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-1)">Firmware</span>
+              <p>Sending OVD1 packet: frame header, boxes, then grayscale bytes.</p>
+            </div>
+          </div>
+        </div>
+        <div class="chat-typing" id="chat-module2-typing" style="display:none">
+          <div class="chat-avatar" id="chat-module2-typing-avatar">?</div>
+          <div class="chat-typing-dots">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+          </div>
+        </div>
+        <div class="chat-controls">
+          <button class="btn chat-next-btn">Next Message</button>
+          <button class="btn chat-all-btn">Play All</button>
+          <button class="btn chat-reset-btn">Replay</button>
+          <span class="chat-progress"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The command router is the switchboard</h2>
+      <p>The <span class="term" data-definition="A switch statement chooses one branch of code based on a value. Here, each incoming character chooses a board action.">switch statement</span> is where a single letter becomes behavior. This is where you steer AI when adding or changing a serial command.</p>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">    case 'D':</span>
+<span class="code-line">    case 'd':</span>
+<span class="code-line">      g_streaming = false;</span>
+<span class="code-line">      g_counting = false;</span>
+<span class="code-line">      g_detecting = true;</span>
+<span class="code-line">      Serial.println("DETECTING");</span>
+<span class="code-line">      break;</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">If the laptop sends uppercase or lowercase D...</p>
+            <p class="tl">turn off raw frame streaming.</p>
+            <p class="tl">turn off continuous text counting.</p>
+            <p class="tl">turn on detection packets.</p>
+            <p class="tl">print a human-readable status line.</p>
+            <p class="tl">stop checking other command cases.</p>
+          </div>
+        </div>
+      </div>
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-content">
+          <strong class="callout-title">Steering Prompt</strong>
+          <p>Useful AI instruction: "Add a new serial command in handleSerialCommands, and make sure it disables incompatible modes before enabling the new one."</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Check your ownership sense</h2>
+      <div class="quiz-container" id="quiz-module2">
+        <div class="quiz-question-block"
+             data-correct="option-c"
+             data-explanation-right="The firmware owns command meanings, because it is the code reading Serial and changing board modes."
+             data-explanation-wrong="The viewer can send a new letter, but the board will ignore it until firmware teaches handleSerialCommands what the letter means.">
+          <h3 class="quiz-question">You want a new command that returns only timing data. Where should AI implement the command meaning first?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="option-a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Only in scripts/detect_web.py</span></button>
+            <button class="quiz-option" data-value="option-b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Only in docs/training_data</span></button>
+            <button class="quiz-option" data-value="option-c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>In nano_33.ino command handling</span></button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+        <button class="quiz-check-btn" onclick="checkQuiz('quiz-module2')">Check Answer</button>
+        <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module2')">Try Again</button>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="module" id="module-3">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">03</span>
+      <h1 class="module-title">How pixels travel over serial</h1>
+      <p class="module-subtitle">The board and laptop use a tiny shipping label: magic bytes say what kind of package is coming, then the payload follows.</p>
+    </header>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Two packet types, two jobs</h2>
+      <p><span class="term" data-definition="Serial is a simple communication channel where bytes travel one after another. USB serial makes the Arduino look like a text-and-byte stream to the laptop.">Serial</span> is not automatically structured. The project creates structure by prefixing each binary packet with a short <span class="term" data-definition="Magic bytes are a recognizable byte pattern at the start of a packet or file. They help the reader resynchronize if bytes are missed.">magic byte</span> marker.</p>
+      <div class="badge-list animate-in">
+        <div class="badge-item">
+          <code class="badge-code">OVF1</code>
+          <span class="badge-desc">Raw frame packet: header plus grayscale image bytes.</span>
+        </div>
+        <div class="badge-item">
+          <code class="badge-code">OVD1</code>
+          <span class="badge-desc">Detection packet: header, bounding boxes, then the same grayscale image bytes.</span>
+        </div>
+        <div class="badge-item">
+          <code class="badge-code">JSON</code>
+          <span class="badge-desc">Single-shot count response for production checks and scripts.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The packet is a labeled parcel</h2>
+      <div class="flow-steps animate-in">
+        <div class="flow-step">
+          <div class="flow-step-num">1</div>
+          <p>Find magic bytes</p>
+        </div>
+        <div class="flow-arrow">-&gt;</div>
+        <div class="flow-step">
+          <div class="flow-step-num">2</div>
+          <p>Read width, height, format</p>
+        </div>
+        <div class="flow-arrow">-&gt;</div>
+        <div class="flow-step">
+          <div class="flow-step-num">3</div>
+          <p>Read detection boxes</p>
+        </div>
+        <div class="flow-arrow">-&gt;</div>
+        <div class="flow-step">
+          <div class="flow-step-num">4</div>
+          <p>Read frame bytes</p>
+        </div>
+      </div>
+      <div class="callout callout-accent">
+        <div class="callout-icon">i</div>
+        <div class="callout-content">
+          <strong class="callout-title">Key Insight</strong>
+          <p>When bytes cross a boundary, both sides need the same contract. In this project, the C++ writer and Python reader must agree on byte order, field order, and packet size.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The Python reader follows the contract</h2>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">def read_packet(ser):</span>
+<span class="code-line">    if not scan_magic(ser):</span>
+<span class="code-line">        return None</span>
+<span class="code-line"></span>
+<span class="code-line">    header = ser.read(HEADER_STRUCT.size)</span>
+<span class="code-line">    if len(header) != HEADER_STRUCT.size:</span>
+<span class="code-line">        return None</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">Start reading one detection packet from the serial stream.</p>
+            <p class="tl">If the OVD1 marker is not found, give up on this attempt.</p>
+            <p class="tl">Read exactly the number of bytes in the binary header.</p>
+            <p class="tl">If the full header did not arrive, reject the packet instead of guessing.</p>
+          </div>
+        </div>
+      </div>
+      <p>The <span class="term" data-definition="A binary header is a fixed-size block of bytes at the start of a packet. It tells the reader how to interpret the data that follows.">binary header</span> prevents the viewer from guessing image size or detection count. That is what makes the stream recoverable when one frame is incomplete.</p>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Match each reader habit to the failure it prevents</h2>
+      <div class="dnd-container" id="dnd-module3">
+        <div class="dnd-chips">
+          <div class="dnd-chip" draggable="true" data-answer="magic">scan_magic</div>
+          <div class="dnd-chip" draggable="true" data-answer="size">frame_size check</div>
+          <div class="dnd-chip" draggable="true" data-answer="lock">serial_lock</div>
+        </div>
+        <div class="dnd-zones">
+          <div class="dnd-zone" data-correct="magic">
+            <p class="dnd-zone-label">The stream starts in the middle of old bytes, so the reader must find the next clean packet start.</p>
+            <div class="dnd-zone-target">Drop here</div>
+          </div>
+          <div class="dnd-zone" data-correct="size">
+            <p class="dnd-zone-label">A corrupt header claims a frame size that does not match width times height times bytes per pixel.</p>
+            <div class="dnd-zone-target">Drop here</div>
+          </div>
+          <div class="dnd-zone" data-correct="lock">
+            <p class="dnd-zone-label">The web UI and reader thread might try to write commands at the same time.</p>
+            <div class="dnd-zone-target">Drop here</div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="checkDnD('dnd-module3')">Check Matches</button>
+        <button class="btn" onclick="resetDnD('dnd-module3')">Reset</button>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Check your debugging move</h2>
+      <div class="quiz-container" id="quiz-module3">
+        <div class="quiz-question-block"
+             data-correct="option-a"
+             data-explanation-right="If image bytes and header math disagree, the viewer cannot safely reshape the frame. The size contract is the first thing to verify."
+             data-explanation-wrong="Exposure and model accuracy can affect the picture or count, but packet-size mismatches point to the serial contract first.">
+          <h3 class="quiz-question">The browser viewer freezes after a few frames, and logs show incomplete packets. Where should you ask AI to inspect first?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="option-a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The OVD1 header layout and frame_size checks</span></button>
+            <button class="quiz-option" data-value="option-b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The model confidence threshold only</span></button>
+            <button class="quiz-option" data-value="option-c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The README setup instructions only</span></button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+        <button class="quiz-check-btn" onclick="checkQuiz('quiz-module3')">Check Answer</button>
+        <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module3')">Try Again</button>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="module" id="module-4">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">How the model sees a smaller world</h1>
+      <p class="module-subtitle">The camera sees a postcard-sized frame. The model wants a square passport photo. The firmware builds a precise crop-and-resize map between them.</p>
+    </header>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Why preprocessing matters</h2>
+      <p><span class="term" data-definition="Preprocessing means transforming raw input into the exact shape and format a model expects. Bad preprocessing can make a good model look broken.">Preprocessing</span> is the promise that training and production see the same kind of image. Here, the camera captures 160x120 grayscale pixels, but the Edge Impulse FOMO model expects a 96x96 grayscale input.</p>
+      <div class="pattern-cards stagger-children">
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+          <div class="pattern-icon" style="background: var(--color-actor-2)">160</div>
+          <h4 class="pattern-title">Camera frame</h4>
+          <p class="pattern-desc">Large enough to see the blister pack, small enough to fit in RAM.</p>
+        </div>
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+          <div class="pattern-icon" style="background: var(--color-actor-4)">96</div>
+          <h4 class="pattern-title">Model input</h4>
+          <p class="pattern-desc">The trained model only understands the input shape it was exported with.</p>
+        </div>
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+          <div class="pattern-icon" style="background: var(--color-actor-5)">int8</div>
+          <h4 class="pattern-title">Tiny data type</h4>
+          <p class="pattern-desc">The model uses compact values to keep memory use practical on the Nano 33 BLE.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The firmware refuses incompatible model exports</h2>
+      <p>A <span class="term" data-definition="A compile-time check is a rule tested while building the program, before it ever runs on hardware. It catches mismatches early.">compile-time check</span> is like a measuring gate at the workshop door. If the model shape no longer matches the firmware assumptions, the build stops before upload.</p>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">static_assert(kInferPixels == EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE,</span>
+<span class="code-line">              "Edge Impulse DSP input must match a single grayscale frame");</span>
+<span class="code-line">static_assert(kFrameWidth &gt;= kInferWidth &amp;&amp; kFrameHeight &gt;= kInferHeight,</span>
+<span class="code-line">              "Camera frame must be at least as large as model input");</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">Confirm the model input pixel count matches one grayscale frame.</p>
+            <p class="tl">If not, stop compilation with a message that explains the mismatch.</p>
+            <p class="tl">Confirm the camera frame is at least as wide and tall as the model input.</p>
+            <p class="tl">If the model is larger than the camera frame, stop before producing bad firmware.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The lookup map saves repeated math</h2>
+      <p>A <span class="term" data-definition="A lookup table is a precomputed list of answers. Instead of recalculating the source pixel for every inference call, the firmware stores the mapping once.">lookup table</span> is a cheat sheet. The board computes where each model pixel comes from once, then reuses that map during inference.</p>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">void initializeInferenceMap() {</span>
+<span class="code-line">  for (uint16_t x = 0; x &lt; kInferWidth; ++x) {</span>
+<span class="code-line">    g_sourceXByInferX[x] = static_cast&lt;uint8_t&gt;(</span>
+<span class="code-line">        kModelSourceX +</span>
+<span class="code-line">        ((static_cast&lt;uint32_t&gt;(x) * kModelSourceWidth) + (kInferWidth / 2)) /</span>
+<span class="code-line">            kInferWidth);</span>
+<span class="code-line">  }</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">Start building the map from model X positions to camera X positions.</p>
+            <p class="tl">Visit every column the model will ask for.</p>
+            <p class="tl">Store the matching camera column in a compact byte array.</p>
+            <p class="tl">Offset into the crop area, then scale from model width to source width.</p>
+            <p class="tl">The half-width term rounds to the nearest source pixel.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Where model boxes become frame boxes</h2>
+      <p>The model predicts boxes in its 96x96 world. The viewer draws boxes on the 160x120 frame, so firmware maps coordinates back to camera space.</p>
+      <div class="icon-rows animate-in">
+        <div class="icon-row">
+          <div class="icon-circle" style="background: var(--color-accent-light); color: var(--color-accent)">A</div>
+          <div><strong>Model box</strong><p>Small square coordinates from Edge Impulse.</p></div>
+        </div>
+        <div class="icon-row">
+          <div class="icon-circle" style="background: var(--color-info-light); color: var(--color-info)">B</div>
+          <div><strong>Crop offset</strong><p>The frame area selected to match the model aspect ratio.</p></div>
+        </div>
+        <div class="icon-row">
+          <div class="icon-circle" style="background: var(--color-success-light); color: var(--color-success)">C</div>
+          <div><strong>Frame box</strong><p>The rectangle that Python can draw on the full camera image.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Check your model-change instinct</h2>
+      <div class="quiz-container" id="quiz-module4">
+        <div class="quiz-question-block"
+             data-correct="option-c"
+             data-explanation-right="Changing the model shape changes preprocessing, coordinate mapping, and memory assumptions. Those checks are there to force a deliberate update."
+             data-explanation-wrong="A model export is not just a zip file swap. The firmware hardcodes assumptions about input size, resize mode, and memory budget.">
+          <h3 class="quiz-question">You export a new 128x128 model and compilation fails on static_assert. What should you ask AI to do?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="option-a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Delete the static_assert lines</span></button>
+            <button class="quiz-option" data-value="option-b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Ignore compile-only checks and upload anyway</span></button>
+            <button class="quiz-option" data-value="option-c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Update preprocessing and memory assumptions for the new input size</span></button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+        <button class="quiz-check-btn" onclick="checkQuiz('quiz-module4')">Check Answer</button>
+        <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module4')">Try Again</button>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="module" id="module-5">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">05</span>
+      <h1 class="module-title">When the system breaks</h1>
+      <p class="module-subtitle">Debugging this project is like checking a chain of adapters: camera, firmware, model, serial link, and viewer each have their own failure shape.</p>
+    </header>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Use the built-in checkpoints</h2>
+      <p>A good <span class="term" data-definition="A smoke test is a quick check that proves the main system starts and basic behavior works. It does not prove everything is correct, but it catches obvious breakage.">smoke test</span> does not need to prove perfection. It should tell you which part of the chain is alive before you chase deeper problems.</p>
+      <div class="step-cards animate-in">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div class="step-body"><strong>Compile only</strong><p>Run SKIP_UPLOAD=1 ./scripts/upload.sh to catch model and memory problems before flashing.</p></div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div class="step-body"><strong>Ask for M</strong><p>Print memory and model diagnostics from firmware.</p></div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div class="step-body"><strong>Ask for T</strong><p>Separate capture time from inference time.</p></div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <div class="step-body"><strong>Ask for J</strong><p>Get one structured production-style count.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The upload script protects RAM</h2>
+      <p><span class="term" data-definition="RAM is short-term working memory. On a microcontroller, running out of RAM can cause crashes, corrupted output, or failed model allocation.">RAM</span> is one of the tightest constraints in this repository. The upload script parses Arduino compile output and blocks unsafe builds.</p>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">if (( DYNAMIC_BYTES &gt; RAM_MAX_BYTES )); then</span>
+<span class="code-line">  echo "ERROR: dynamic memory ${DYNAMIC_BYTES} exceeds hard limit ${RAM_MAX_BYTES}." &gt;&amp;2</span>
+<span class="code-line">  echo "Re-export the Edge Impulse model with a smaller arena before uploading." &gt;&amp;2</span>
+<span class="code-line">  exit 1</span>
+<span class="code-line">fi</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">If the compiled firmware uses more dynamic memory than the hard limit...</p>
+            <p class="tl">print an error that includes the measured bytes and the allowed maximum.</p>
+            <p class="tl">tell the human the likely fix: export a smaller Edge Impulse arena.</p>
+            <p class="tl">stop the script so unsafe firmware is not uploaded.</p>
+          </div>
+        </div>
+      </div>
+      <div class="callout callout-warning">
+        <div class="callout-icon">!</div>
+        <div class="callout-content">
+          <strong class="callout-title">Common AI Mistake</strong>
+          <p>If an AI assistant suggests removing memory limits to make upload pass, push back. The limit is protecting hardware behavior, not merely making the script strict.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Spot a real command mismatch</h2>
+      <p>This is the kind of bug that appears when two files disagree about the protocol. The firmware uses lowercase c for calibrated exposure, while uppercase C runs a single count.</p>
+      <div class="bug-challenge">
+        <h3>Which line makes calibrated mode send the wrong firmware command?</h3>
+        <div class="bug-code">
+          <div class="bug-line bug-target" data-line="1" onclick="checkBugLine(this, true)" data-explanation="The calibrated mapping uses uppercase C, but firmware reserves uppercase C for doSingleCount. The viewer should send lowercase c for calibrated exposure.">
+            <span class="line-num">1</span>
+            <code>    mode_cmd = {"auto": b"A", "face": b"F", "calibrated": b"C", "stream": b"S"}</code>
+          </div>
+          <div class="bug-line" data-line="2" onclick="checkBugLine(this, false)" data-hint="This line checks whether the selected mode has a command. That part is reasonable.">
+            <span class="line-num">2</span>
+            <code>    if args.mode in mode_cmd:</code>
+          </div>
+          <div class="bug-line" data-line="3" onclick="checkBugLine(this, false)" data-hint="This line sends the selected byte, but the wrong byte was chosen earlier in the mapping.">
+            <span class="line-num">3</span>
+            <code>        ser.write(mode_cmd[args.mode])</code>
+          </div>
+          <div class="bug-line" data-line="4" onclick="checkBugLine(this, false)" data-hint="Printing the selected mode is not what changes board behavior.">
+            <span class="line-num">4</span>
+            <code>        print(f"Sent mode command: {args.mode}")</code>
+          </div>
+        </div>
+        <div class="bug-feedback" id="bug-feedback"></div>
+      </div>
+      <p>The root cause is the dictionary value for calibrated mode. This is a protocol mismatch: one side says C means count, the other side tries to use C for calibration.</p>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Use symptoms to choose the layer</h2>
+      <div class="arch-diagram animate-in">
+        <div class="arch-zone">
+          <h4 class="arch-zone-label">Hardware and firmware</h4>
+          <div class="arch-component" data-desc="If there is no NANO33_OV7675_READY line, start with setup, camera init, USB cable, and board port.">
+            <div class="arch-icon">HW</div>
+            <span>Board startup</span>
+          </div>
+          <div class="arch-component" data-desc="If counts are slow but packets arrive, compare T output for capture_ms, dsp_ms, nn_ms, and post_ms.">
+            <div class="arch-icon">TM</div>
+            <span>Timing profile</span>
+          </div>
+        </div>
+        <div class="arch-zone">
+          <h4 class="arch-zone-label">Laptop tools</h4>
+          <div class="arch-component" data-desc="If the browser UI is blank but firmware prints DETECTING, inspect detect_web.py packet parsing and MJPEG state.">
+            <div class="arch-icon">UI</div>
+            <span>Web viewer</span>
+          </div>
+          <div class="arch-component" data-desc="If upload fails before flashing, inspect RAM limits, model export size, and arduino-cli compile output.">
+            <div class="arch-icon">UP</div>
+            <span>Upload script</span>
+          </div>
+        </div>
+        <div class="arch-description" id="arch-desc">Click any component to see where to debug first.</div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Check your debug prompt</h2>
+      <div class="quiz-container" id="quiz-module5">
+        <div class="quiz-question-block"
+             data-correct="option-b"
+             data-explanation-right="This prompt gives the symptom, the relevant command, and asks for layer-specific checks instead of a broad rewrite."
+             data-explanation-wrong="A vague prompt makes AI change random parts. Give the symptom, the command path, and the layers to inspect.">
+          <h3 class="quiz-question">The browser connects, but the count stays zero under good lighting. Which prompt is strongest?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="option-a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Fix the app. Something is broken.</span></button>
+            <button class="quiz-option" data-value="option-b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Trace D detection mode from firmware boxes to detect_web.py stats, and check threshold, label filtering, and box mapping.</span></button>
+            <button class="quiz-option" data-value="option-c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Delete the confidence threshold so all boxes show up.</span></button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+        <button class="quiz-check-btn" onclick="checkQuiz('quiz-module5')">Check Answer</button>
+        <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module5')">Try Again</button>
+      </div>
+    </div>
+  </div>
+</section>
+  </main>
+
+</body>
+</html>

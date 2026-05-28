@@ -1,0 +1,140 @@
+<section class="module" id="module-5">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">05</span>
+      <h1 class="module-title">When the system breaks</h1>
+      <p class="module-subtitle">Debugging this project is like checking a chain of adapters: camera, firmware, model, serial link, and viewer each have their own failure shape.</p>
+    </header>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Use the built-in checkpoints</h2>
+      <p>A good <span class="term" data-definition="A smoke test is a quick check that proves the main system starts and basic behavior works. It does not prove everything is correct, but it catches obvious breakage.">smoke test</span> does not need to prove perfection. It should tell you which part of the chain is alive before you chase deeper problems.</p>
+      <div class="step-cards animate-in">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div class="step-body"><strong>Compile only</strong><p>Run SKIP_UPLOAD=1 ./scripts/upload.sh to catch model and memory problems before flashing.</p></div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div class="step-body"><strong>Ask for M</strong><p>Print memory and model diagnostics from firmware.</p></div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div class="step-body"><strong>Ask for T</strong><p>Separate capture time from inference time.</p></div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <div class="step-body"><strong>Ask for J</strong><p>Get one structured production-style count.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The upload script protects RAM</h2>
+      <p><span class="term" data-definition="RAM is short-term working memory. On a microcontroller, running out of RAM can cause crashes, corrupted output, or failed model allocation.">RAM</span> is one of the tightest constraints in this repository. The upload script parses Arduino compile output and blocks unsafe builds.</p>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">if (( DYNAMIC_BYTES &gt; RAM_MAX_BYTES )); then</span>
+<span class="code-line">  echo "ERROR: dynamic memory ${DYNAMIC_BYTES} exceeds hard limit ${RAM_MAX_BYTES}." &gt;&amp;2</span>
+<span class="code-line">  echo "Re-export the Edge Impulse model with a smaller arena before uploading." &gt;&amp;2</span>
+<span class="code-line">  exit 1</span>
+<span class="code-line">fi</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">If the compiled firmware uses more dynamic memory than the hard limit...</p>
+            <p class="tl">print an error that includes the measured bytes and the allowed maximum.</p>
+            <p class="tl">tell the human the likely fix: export a smaller Edge Impulse arena.</p>
+            <p class="tl">stop the script so unsafe firmware is not uploaded.</p>
+          </div>
+        </div>
+      </div>
+      <div class="callout callout-warning">
+        <div class="callout-icon">!</div>
+        <div class="callout-content">
+          <strong class="callout-title">Common AI Mistake</strong>
+          <p>If an AI assistant suggests removing memory limits to make upload pass, push back. The limit is protecting hardware behavior, not merely making the script strict.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Spot a real command mismatch</h2>
+      <p>This is the kind of bug that appears when two files disagree about the protocol. The firmware uses lowercase c for calibrated exposure, while uppercase C runs a single count.</p>
+      <div class="bug-challenge">
+        <h3>Which line makes calibrated mode send the wrong firmware command?</h3>
+        <div class="bug-code">
+          <div class="bug-line bug-target" data-line="1" onclick="checkBugLine(this, true)" data-explanation="The calibrated mapping uses uppercase C, but firmware reserves uppercase C for doSingleCount. The viewer should send lowercase c for calibrated exposure.">
+            <span class="line-num">1</span>
+            <code>    mode_cmd = {"auto": b"A", "face": b"F", "calibrated": b"C", "stream": b"S"}</code>
+          </div>
+          <div class="bug-line" data-line="2" onclick="checkBugLine(this, false)" data-hint="This line checks whether the selected mode has a command. That part is reasonable.">
+            <span class="line-num">2</span>
+            <code>    if args.mode in mode_cmd:</code>
+          </div>
+          <div class="bug-line" data-line="3" onclick="checkBugLine(this, false)" data-hint="This line sends the selected byte, but the wrong byte was chosen earlier in the mapping.">
+            <span class="line-num">3</span>
+            <code>        ser.write(mode_cmd[args.mode])</code>
+          </div>
+          <div class="bug-line" data-line="4" onclick="checkBugLine(this, false)" data-hint="Printing the selected mode is not what changes board behavior.">
+            <span class="line-num">4</span>
+            <code>        print(f"Sent mode command: {args.mode}")</code>
+          </div>
+        </div>
+        <div class="bug-feedback" id="bug-feedback"></div>
+      </div>
+      <p>The root cause is the dictionary value for calibrated mode. This is a protocol mismatch: one side says C means count, the other side tries to use C for calibration.</p>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Use symptoms to choose the layer</h2>
+      <div class="arch-diagram animate-in">
+        <div class="arch-zone">
+          <h4 class="arch-zone-label">Hardware and firmware</h4>
+          <div class="arch-component" data-desc="If there is no NANO33_OV7675_READY line, start with setup, camera init, USB cable, and board port.">
+            <div class="arch-icon">HW</div>
+            <span>Board startup</span>
+          </div>
+          <div class="arch-component" data-desc="If counts are slow but packets arrive, compare T output for capture_ms, dsp_ms, nn_ms, and post_ms.">
+            <div class="arch-icon">TM</div>
+            <span>Timing profile</span>
+          </div>
+        </div>
+        <div class="arch-zone">
+          <h4 class="arch-zone-label">Laptop tools</h4>
+          <div class="arch-component" data-desc="If the browser UI is blank but firmware prints DETECTING, inspect detect_web.py packet parsing and MJPEG state.">
+            <div class="arch-icon">UI</div>
+            <span>Web viewer</span>
+          </div>
+          <div class="arch-component" data-desc="If upload fails before flashing, inspect RAM limits, model export size, and arduino-cli compile output.">
+            <div class="arch-icon">UP</div>
+            <span>Upload script</span>
+          </div>
+        </div>
+        <div class="arch-description" id="arch-desc">Click any component to see where to debug first.</div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Check your debug prompt</h2>
+      <div class="quiz-container" id="quiz-module5">
+        <div class="quiz-question-block"
+             data-correct="option-b"
+             data-explanation-right="This prompt gives the symptom, the relevant command, and asks for layer-specific checks instead of a broad rewrite."
+             data-explanation-wrong="A vague prompt makes AI change random parts. Give the symptom, the command path, and the layers to inspect.">
+          <h3 class="quiz-question">The browser connects, but the count stays zero under good lighting. Which prompt is strongest?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="option-a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Fix the app. Something is broken.</span></button>
+            <button class="quiz-option" data-value="option-b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Trace D detection mode from firmware boxes to detect_web.py stats, and check threshold, label filtering, and box mapping.</span></button>
+            <button class="quiz-option" data-value="option-c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Delete the confidence threshold so all boxes show up.</span></button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+        <button class="quiz-check-btn" onclick="checkQuiz('quiz-module5')">Check Answer</button>
+        <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module5')">Try Again</button>
+      </div>
+    </div>
+  </div>
+</section>

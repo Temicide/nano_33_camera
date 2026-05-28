@@ -1,0 +1,116 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "Nano 33 Medicine Counting Tour",
+  "description": "A new-joiner walkthrough of the firmware, serial protocol, browser tooling, model deployment, and data-check workflow.",
+  "ref": "counting_model",
+  "steps": [
+    {
+      "file": "README.md",
+      "line": 11,
+      "title": "Repository Map",
+      "description": "Start with the project map: firmware lives in one Arduino sketch, host tools live in scripts, and captures plus research notes live under docs. The important gotcha is that generated paths like build, captures, logs, and .venv are local workspace state, not source of truth."
+    },
+    {
+      "file": "README.md",
+      "line": 44,
+      "title": "Model Contract",
+      "description": "The firmware is coupled to an Edge Impulse library named pill_counting_inferencing with 96x96 grayscale int8 input. Any new model export must preserve that shape and memory budget, otherwise the sketch may compile but fail at runtime on the Nano 33 BLE SRAM limit."
+    },
+    {
+      "file": "nano_33/nano_33.ino",
+      "line": 14,
+      "title": "Firmware Constants",
+      "description": "This block defines the runtime envelope: 921600 baud, QQVGA capture, 160x120 grayscale frames, and binary stream magic values. The static_assert checks are intentional guardrails; if a model or camera mode changes, the build should fail before a mismatched stream reaches the host tools."
+    },
+    {
+      "file": "nano_33/nano_33.ino",
+      "line": 47,
+      "title": "Preprocessing Assumption",
+      "description": "The sketch mirrors Edge Impulse FIT_SHORTEST preprocessing by center-cropping the 160x120 camera frame before sampling it as the model input. This is easy to miss because Edge Impulse training settings do not automatically resize live embedded frames."
+    },
+    {
+      "file": "nano_33/nano_33.ino",
+      "line": 139,
+      "title": "Single Frame Buffer",
+      "description": "The firmware keeps one camera frame buffer and two lookup tables for model sampling. That shape is the core RAM strategy: inference reads from the capture buffer on demand rather than allocating a second 96x96 image."
+    },
+    {
+      "file": "nano_33/nano_33.ino",
+      "line": 319,
+      "title": "Inference Map",
+      "description": "initializeInferenceMap precomputes source columns and row offsets for each model pixel. The mechanism trades a small static lookup table for less per-inference math, and the gotcha is that these tables depend on the camera and model dimensions above."
+    },
+    {
+      "file": "nano_33/nano_33.ino",
+      "line": 337,
+      "title": "Edge Impulse Signal",
+      "description": "ei_get_frame_data is the callback Edge Impulse uses to pull features. It converts each grayscale byte into packed RGB-style float values expected by the classifier, so preprocessing parity lives here rather than in a separate image buffer."
+    },
+    {
+      "file": "nano_33/nano_33.ino",
+      "line": 497,
+      "title": "Classifier Bridge",
+      "description": "runInference wraps the Edge Impulse signal and calls run_classifier. The counting paths below all share this bridge, so bugs in feature layout or model metadata surface consistently across JSON counts, profiles, and detection streams."
+    },
+    {
+      "file": "nano_33/nano_33.ino",
+      "line": 525,
+      "title": "Production Count",
+      "description": "doJsonCount is the production-style single-shot path for command J. It captures one frame, times inference, filters blister detections, maps boxes back to the camera frame, and prints one JSON line that host scripts can parse without scraping human text."
+    },
+    {
+      "file": "nano_33/nano_33.ino",
+      "line": 609,
+      "title": "Detection Frames",
+      "description": "doDetectionFrame is the streaming detection path for command D. It writes an OVD1 header, serialized boxes, then the grayscale frame bytes; host viewers must decode this exact packet order or they will lose frame alignment."
+    },
+    {
+      "file": "nano_33/nano_33.ino",
+      "line": 648,
+      "title": "Serial Command Router",
+      "description": "handleSerialCommands is the firmware control plane. Single characters toggle mutually exclusive modes, and exposure commands can be sent while the board is alive, which is why the host tools only need a serial port and not a richer RPC layer."
+    },
+    {
+      "file": "scripts/detect_web.py",
+      "line": 14,
+      "title": "Host Packet Decoder",
+      "description": "The browser detector repeats the firmware's OVD1 contract with struct formats for the header and detections. This duplication is deliberate but brittle: when firmware packet fields change, this decoder and the OpenCV viewer need the same update."
+    },
+    {
+      "file": "scripts/detect_web.py",
+      "line": 149,
+      "title": "Serial Reader Thread",
+      "description": "serial_reader owns the live board connection, waits for NANO33_OV7675_READY, starts D mode, decodes packets, overlays boxes, and publishes JPEG plus stats for Flask routes. The thread boundary keeps the web UI responsive while serial reads block."
+    },
+    {
+      "file": "scripts/templates/detect.html",
+      "line": 191,
+      "title": "Browser Control Surface",
+      "description": "The UI consumes /stream for MJPEG frames and /stats for count, FPS, frame id, and detections. Its buttons post the same one-character firmware modes through /control, so UI behavior is thin glue over the serial protocol."
+    },
+    {
+      "file": "scripts/ei_deploy.sh",
+      "line": 201,
+      "title": "Model Deploy Gate",
+      "description": "validate_model checks the exported Edge Impulse metadata before installing it as an Arduino library. It enforces 96x96 grayscale int8 input and arena limits, catching the common failure where a model is accurate in Studio but too large for the board."
+    },
+    {
+      "file": "scripts/upload.sh",
+      "line": 17,
+      "title": "Build And RAM Gate",
+      "description": "upload.sh compiles with static Edge Impulse allocation, parses Arduino dynamic memory usage, and blocks uploads that exceed the configured hard limit. For firmware review, SKIP_UPLOAD=1 runs this same safety check without touching hardware."
+    },
+    {
+      "file": "scripts/data_collector.py",
+      "line": 157,
+      "title": "Training Captures",
+      "description": "The basic collector saves the latest streamed grayscale frame into docs/training_data as blister_NNNN.png. It uses the raw OVF1 frame stream rather than detection packets, so capture quality and naming stay independent from model output."
+    },
+    {
+      "file": "scripts/test_training_data.py",
+      "line": 137,
+      "title": "Preprocessing Parity Check",
+      "description": "test_training_data.py preprocesses saved images with the same crop and resize math as firmware, runs a local classifier runner, and writes a CSV summary. Use this when model or preprocessing changes need evidence beyond a live visual smoke test."
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+<section class="module" id="module-2">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">02</span>
+      <h1 class="module-title">Meet the actors</h1>
+      <p class="module-subtitle">A hardware project is like a stage crew: several specialists work together, and each one should own a clear job.</p>
+    </header>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The project is split by responsibility</h2>
+      <p>A <span class="term" data-definition="A module is a file or group of files that owns one part of the job. Telling AI which module should change prevents broad, messy edits.">module</span> should be easy to describe in one sentence. This repository mostly follows that rule: firmware talks to hardware, scripts talk to the board, and docs store evidence.</p>
+      <div class="file-tree animate-in">
+        <div class="ft-folder">
+          <span class="ft-name">nano_33</span><span class="ft-desc">the board program</span>
+          <div class="ft-children">
+            <div class="ft-file"><span class="ft-name">nano_33.ino</span><span class="ft-desc">camera, inference, serial protocol</span></div>
+          </div>
+        </div>
+        <div class="ft-folder">
+          <span class="ft-name">scripts</span><span class="ft-desc">laptop-side helpers</span>
+          <div class="ft-children">
+            <div class="ft-file"><span class="ft-name">detect_web.py</span><span class="ft-desc">Flask browser viewer</span></div>
+            <div class="ft-file"><span class="ft-name">live_camera_view.py</span><span class="ft-desc">OpenCV live view</span></div>
+            <div class="ft-file"><span class="ft-name">upload.sh</span><span class="ft-desc">compile, RAM guard, upload</span></div>
+          </div>
+        </div>
+        <div class="ft-folder">
+          <span class="ft-name">docs</span><span class="ft-desc">training data and research notes</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">What they say to each other</h2>
+      <p>A serial project is easiest to understand as a group chat. The laptop only sends tiny command messages; the board decides what each command means.</p>
+      <div class="chat-window" id="chat-module2">
+        <div class="chat-messages">
+          <div class="chat-message" data-msg="0" data-sender="viewer" style="display:none">
+            <div class="chat-avatar" style="background: var(--color-actor-2)">V</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-2)">Viewer</span>
+              <p>I need live detections for the browser. Sending D.</p>
+            </div>
+          </div>
+          <div class="chat-message" data-msg="1" data-sender="firmware" style="display:none">
+            <div class="chat-avatar" style="background: var(--color-actor-1)">F</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-1)">Firmware</span>
+              <p>Switching out of raw stream and count mode. Detection mode is on.</p>
+            </div>
+          </div>
+          <div class="chat-message" data-msg="2" data-sender="model" style="display:none">
+            <div class="chat-avatar" style="background: var(--color-actor-3)">M</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-3)">Model</span>
+              <p>I found blister boxes above the confidence threshold.</p>
+            </div>
+          </div>
+          <div class="chat-message" data-msg="3" data-sender="firmware" style="display:none">
+            <div class="chat-avatar" style="background: var(--color-actor-1)">F</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-1)">Firmware</span>
+              <p>Sending OVD1 packet: frame header, boxes, then grayscale bytes.</p>
+            </div>
+          </div>
+        </div>
+        <div class="chat-typing" id="chat-module2-typing" style="display:none">
+          <div class="chat-avatar" id="chat-module2-typing-avatar">?</div>
+          <div class="chat-typing-dots">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+          </div>
+        </div>
+        <div class="chat-controls">
+          <button class="btn chat-next-btn">Next Message</button>
+          <button class="btn chat-all-btn">Play All</button>
+          <button class="btn chat-reset-btn">Replay</button>
+          <span class="chat-progress"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The command router is the switchboard</h2>
+      <p>The <span class="term" data-definition="A switch statement chooses one branch of code based on a value. Here, each incoming character chooses a board action.">switch statement</span> is where a single letter becomes behavior. This is where you steer AI when adding or changing a serial command.</p>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">    case 'D':</span>
+<span class="code-line">    case 'd':</span>
+<span class="code-line">      g_streaming = false;</span>
+<span class="code-line">      g_counting = false;</span>
+<span class="code-line">      g_detecting = true;</span>
+<span class="code-line">      Serial.println("DETECTING");</span>
+<span class="code-line">      break;</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">If the laptop sends uppercase or lowercase D...</p>
+            <p class="tl">turn off raw frame streaming.</p>
+            <p class="tl">turn off continuous text counting.</p>
+            <p class="tl">turn on detection packets.</p>
+            <p class="tl">print a human-readable status line.</p>
+            <p class="tl">stop checking other command cases.</p>
+          </div>
+        </div>
+      </div>
+      <div class="callout callout-info">
+        <div class="callout-icon">i</div>
+        <div class="callout-content">
+          <strong class="callout-title">Steering Prompt</strong>
+          <p>Useful AI instruction: "Add a new serial command in handleSerialCommands, and make sure it disables incompatible modes before enabling the new one."</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Check your ownership sense</h2>
+      <div class="quiz-container" id="quiz-module2">
+        <div class="quiz-question-block"
+             data-correct="option-c"
+             data-explanation-right="The firmware owns command meanings, because it is the code reading Serial and changing board modes."
+             data-explanation-wrong="The viewer can send a new letter, but the board will ignore it until firmware teaches handleSerialCommands what the letter means.">
+          <h3 class="quiz-question">You want a new command that returns only timing data. Where should AI implement the command meaning first?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="option-a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Only in scripts/detect_web.py</span></button>
+            <button class="quiz-option" data-value="option-b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Only in docs/training_data</span></button>
+            <button class="quiz-option" data-value="option-c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>In nano_33.ino command handling</span></button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+        <button class="quiz-check-btn" onclick="checkQuiz('quiz-module2')">Check Answer</button>
+        <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module2')">Try Again</button>
+      </div>
+    </div>
+  </div>
+</section>

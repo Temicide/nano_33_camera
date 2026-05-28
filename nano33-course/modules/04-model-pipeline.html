@@ -1,0 +1,120 @@
+<section class="module" id="module-4">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">How the model sees a smaller world</h1>
+      <p class="module-subtitle">The camera sees a postcard-sized frame. The model wants a square passport photo. The firmware builds a precise crop-and-resize map between them.</p>
+    </header>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Why preprocessing matters</h2>
+      <p><span class="term" data-definition="Preprocessing means transforming raw input into the exact shape and format a model expects. Bad preprocessing can make a good model look broken.">Preprocessing</span> is the promise that training and production see the same kind of image. Here, the camera captures 160x120 grayscale pixels, but the Edge Impulse FOMO model expects a 96x96 grayscale input.</p>
+      <div class="pattern-cards stagger-children">
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+          <div class="pattern-icon" style="background: var(--color-actor-2)">160</div>
+          <h4 class="pattern-title">Camera frame</h4>
+          <p class="pattern-desc">Large enough to see the blister pack, small enough to fit in RAM.</p>
+        </div>
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+          <div class="pattern-icon" style="background: var(--color-actor-4)">96</div>
+          <h4 class="pattern-title">Model input</h4>
+          <p class="pattern-desc">The trained model only understands the input shape it was exported with.</p>
+        </div>
+        <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+          <div class="pattern-icon" style="background: var(--color-actor-5)">int8</div>
+          <h4 class="pattern-title">Tiny data type</h4>
+          <p class="pattern-desc">The model uses compact values to keep memory use practical on the Nano 33 BLE.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The firmware refuses incompatible model exports</h2>
+      <p>A <span class="term" data-definition="A compile-time check is a rule tested while building the program, before it ever runs on hardware. It catches mismatches early.">compile-time check</span> is like a measuring gate at the workshop door. If the model shape no longer matches the firmware assumptions, the build stops before upload.</p>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">static_assert(kInferPixels == EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE,</span>
+<span class="code-line">              "Edge Impulse DSP input must match a single grayscale frame");</span>
+<span class="code-line">static_assert(kFrameWidth &gt;= kInferWidth &amp;&amp; kFrameHeight &gt;= kInferHeight,</span>
+<span class="code-line">              "Camera frame must be at least as large as model input");</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">Confirm the model input pixel count matches one grayscale frame.</p>
+            <p class="tl">If not, stop compilation with a message that explains the mismatch.</p>
+            <p class="tl">Confirm the camera frame is at least as wide and tall as the model input.</p>
+            <p class="tl">If the model is larger than the camera frame, stop before producing bad firmware.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The lookup map saves repeated math</h2>
+      <p>A <span class="term" data-definition="A lookup table is a precomputed list of answers. Instead of recalculating the source pixel for every inference call, the firmware stores the mapping once.">lookup table</span> is a cheat sheet. The board computes where each model pixel comes from once, then reuses that map during inference.</p>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">void initializeInferenceMap() {</span>
+<span class="code-line">  for (uint16_t x = 0; x &lt; kInferWidth; ++x) {</span>
+<span class="code-line">    g_sourceXByInferX[x] = static_cast&lt;uint8_t&gt;(</span>
+<span class="code-line">        kModelSourceX +</span>
+<span class="code-line">        ((static_cast&lt;uint32_t&gt;(x) * kModelSourceWidth) + (kInferWidth / 2)) /</span>
+<span class="code-line">            kInferWidth);</span>
+<span class="code-line">  }</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">Start building the map from model X positions to camera X positions.</p>
+            <p class="tl">Visit every column the model will ask for.</p>
+            <p class="tl">Store the matching camera column in a compact byte array.</p>
+            <p class="tl">Offset into the crop area, then scale from model width to source width.</p>
+            <p class="tl">The half-width term rounds to the nearest source pixel.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Where model boxes become frame boxes</h2>
+      <p>The model predicts boxes in its 96x96 world. The viewer draws boxes on the 160x120 frame, so firmware maps coordinates back to camera space.</p>
+      <div class="icon-rows animate-in">
+        <div class="icon-row">
+          <div class="icon-circle" style="background: var(--color-accent-light); color: var(--color-accent)">A</div>
+          <div><strong>Model box</strong><p>Small square coordinates from Edge Impulse.</p></div>
+        </div>
+        <div class="icon-row">
+          <div class="icon-circle" style="background: var(--color-info-light); color: var(--color-info)">B</div>
+          <div><strong>Crop offset</strong><p>The frame area selected to match the model aspect ratio.</p></div>
+        </div>
+        <div class="icon-row">
+          <div class="icon-circle" style="background: var(--color-success-light); color: var(--color-success)">C</div>
+          <div><strong>Frame box</strong><p>The rectangle that Python can draw on the full camera image.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Check your model-change instinct</h2>
+      <div class="quiz-container" id="quiz-module4">
+        <div class="quiz-question-block"
+             data-correct="option-c"
+             data-explanation-right="Changing the model shape changes preprocessing, coordinate mapping, and memory assumptions. Those checks are there to force a deliberate update."
+             data-explanation-wrong="A model export is not just a zip file swap. The firmware hardcodes assumptions about input size, resize mode, and memory budget.">
+          <h3 class="quiz-question">You export a new 128x128 model and compilation fails on static_assert. What should you ask AI to do?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="option-a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Delete the static_assert lines</span></button>
+            <button class="quiz-option" data-value="option-b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Ignore compile-only checks and upload anyway</span></button>
+            <button class="quiz-option" data-value="option-c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Update preprocessing and memory assumptions for the new input size</span></button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+        <button class="quiz-check-btn" onclick="checkQuiz('quiz-module4')">Check Answer</button>
+        <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module4')">Try Again</button>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,133 @@
+<section class="module" id="module-3">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">03</span>
+      <h1 class="module-title">How pixels travel over serial</h1>
+      <p class="module-subtitle">The board and laptop use a tiny shipping label: magic bytes say what kind of package is coming, then the payload follows.</p>
+    </header>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Two packet types, two jobs</h2>
+      <p><span class="term" data-definition="Serial is a simple communication channel where bytes travel one after another. USB serial makes the Arduino look like a text-and-byte stream to the laptop.">Serial</span> is not automatically structured. The project creates structure by prefixing each binary packet with a short <span class="term" data-definition="Magic bytes are a recognizable byte pattern at the start of a packet or file. They help the reader resynchronize if bytes are missed.">magic byte</span> marker.</p>
+      <div class="badge-list animate-in">
+        <div class="badge-item">
+          <code class="badge-code">OVF1</code>
+          <span class="badge-desc">Raw frame packet: header plus grayscale image bytes.</span>
+        </div>
+        <div class="badge-item">
+          <code class="badge-code">OVD1</code>
+          <span class="badge-desc">Detection packet: header, bounding boxes, then the same grayscale image bytes.</span>
+        </div>
+        <div class="badge-item">
+          <code class="badge-code">JSON</code>
+          <span class="badge-desc">Single-shot count response for production checks and scripts.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The packet is a labeled parcel</h2>
+      <div class="flow-steps animate-in">
+        <div class="flow-step">
+          <div class="flow-step-num">1</div>
+          <p>Find magic bytes</p>
+        </div>
+        <div class="flow-arrow">-&gt;</div>
+        <div class="flow-step">
+          <div class="flow-step-num">2</div>
+          <p>Read width, height, format</p>
+        </div>
+        <div class="flow-arrow">-&gt;</div>
+        <div class="flow-step">
+          <div class="flow-step-num">3</div>
+          <p>Read detection boxes</p>
+        </div>
+        <div class="flow-arrow">-&gt;</div>
+        <div class="flow-step">
+          <div class="flow-step-num">4</div>
+          <p>Read frame bytes</p>
+        </div>
+      </div>
+      <div class="callout callout-accent">
+        <div class="callout-icon">i</div>
+        <div class="callout-content">
+          <strong class="callout-title">Key Insight</strong>
+          <p>When bytes cross a boundary, both sides need the same contract. In this project, the C++ writer and Python reader must agree on byte order, field order, and packet size.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">The Python reader follows the contract</h2>
+      <div class="translation-block animate-in">
+        <div class="translation-code">
+          <span class="translation-label">CODE</span>
+          <pre><code><span class="code-line">def read_packet(ser):</span>
+<span class="code-line">    if not scan_magic(ser):</span>
+<span class="code-line">        return None</span>
+<span class="code-line"></span>
+<span class="code-line">    header = ser.read(HEADER_STRUCT.size)</span>
+<span class="code-line">    if len(header) != HEADER_STRUCT.size:</span>
+<span class="code-line">        return None</span></code></pre>
+        </div>
+        <div class="translation-english">
+          <span class="translation-label">PLAIN ENGLISH</span>
+          <div class="translation-lines">
+            <p class="tl">Start reading one detection packet from the serial stream.</p>
+            <p class="tl">If the OVD1 marker is not found, give up on this attempt.</p>
+            <p class="tl">Read exactly the number of bytes in the binary header.</p>
+            <p class="tl">If the full header did not arrive, reject the packet instead of guessing.</p>
+          </div>
+        </div>
+      </div>
+      <p>The <span class="term" data-definition="A binary header is a fixed-size block of bytes at the start of a packet. It tells the reader how to interpret the data that follows.">binary header</span> prevents the viewer from guessing image size or detection count. That is what makes the stream recoverable when one frame is incomplete.</p>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Match each reader habit to the failure it prevents</h2>
+      <div class="dnd-container" id="dnd-module3">
+        <div class="dnd-chips">
+          <div class="dnd-chip" draggable="true" data-answer="magic">scan_magic</div>
+          <div class="dnd-chip" draggable="true" data-answer="size">frame_size check</div>
+          <div class="dnd-chip" draggable="true" data-answer="lock">serial_lock</div>
+        </div>
+        <div class="dnd-zones">
+          <div class="dnd-zone" data-correct="magic">
+            <p class="dnd-zone-label">The stream starts in the middle of old bytes, so the reader must find the next clean packet start.</p>
+            <div class="dnd-zone-target">Drop here</div>
+          </div>
+          <div class="dnd-zone" data-correct="size">
+            <p class="dnd-zone-label">A corrupt header claims a frame size that does not match width times height times bytes per pixel.</p>
+            <div class="dnd-zone-target">Drop here</div>
+          </div>
+          <div class="dnd-zone" data-correct="lock">
+            <p class="dnd-zone-label">The web UI and reader thread might try to write commands at the same time.</p>
+            <div class="dnd-zone-target">Drop here</div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="checkDnD('dnd-module3')">Check Matches</button>
+        <button class="btn" onclick="resetDnD('dnd-module3')">Reset</button>
+      </div>
+    </div>
+
+    <div class="screen animate-in">
+      <h2 class="screen-heading">Check your debugging move</h2>
+      <div class="quiz-container" id="quiz-module3">
+        <div class="quiz-question-block"
+             data-correct="option-a"
+             data-explanation-right="If image bytes and header math disagree, the viewer cannot safely reshape the frame. The size contract is the first thing to verify."
+             data-explanation-wrong="Exposure and model accuracy can affect the picture or count, but packet-size mismatches point to the serial contract first.">
+          <h3 class="quiz-question">The browser viewer freezes after a few frames, and logs show incomplete packets. Where should you ask AI to inspect first?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="option-a" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The OVD1 header layout and frame_size checks</span></button>
+            <button class="quiz-option" data-value="option-b" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The model confidence threshold only</span></button>
+            <button class="quiz-option" data-value="option-c" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The README setup instructions only</span></button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+        <button class="quiz-check-btn" onclick="checkQuiz('quiz-module3')">Check Answer</button>
+        <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module3')">Try Again</button>
+      </div>
+    </div>
+  </div>
+</section>
