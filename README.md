@@ -1,28 +1,30 @@
-# nano_33 — Arduino Nano 33 BLE + OV7675 Camera
+# Nano 33 Medicine Counting
 
-Arduino Nano 33 BLE project with OV7675 camera streaming and TinyML inference, using `arduino-cli` from the terminal.
-
-## Branches
-
-| Branch           | What it does                                                            |
-| ---------------- | ----------------------------------------------------------------------- |
-| `main`           | Base setup — board toolchain, upload scripts, serial monitor            |
-| `grayscale`      | Live 160×120 grayscale camera stream over USB serial with Python viewer |
-| `counting_model` | Edge Impulse FOMO model — medicine counting inference on-device         |
-
----
+Arduino Nano 33 BLE + OV7675 camera project for counting medicine blister cells on-device with an Edge Impulse FOMO object-detection model. The firmware captures 160x120 grayscale frames, crops/resizes them to the model's 96x96 input, and streams either raw frames, detection frames, or JSON count results over USB serial.
 
 ## Hardware
 
-- **Arduino Nano 33 BLE** (nRF52840, Cortex-M4 @ 64 MHz, 256 KB RAM)
-- **Arduino TinyML Shield** with **OV7675 camera** (up to 640×480)
-- Data-capable USB cable (not charge-only)
+- Arduino Nano 33 BLE (`arduino:mbed_nano:nano33ble`)
+- Arduino TinyML Shield with OV7675 camera
+- Data-capable USB cable
 
----
+## Repository Layout
 
-## One-time Setup
+```text
+nano_33/
+├── nano_33/nano_33.ino       # Firmware: camera capture, Edge Impulse inference, serial protocol
+├── scripts/                  # Upload, monitor, viewers, collectors, calibration, model checks
+├── scripts/templates/        # Flask UI templates for browser tools
+├── docs/training_data/       # Captured blister images and board-detection metadata
+├── docs/research/            # Research notes, experiments, and reports
+└── data/                     # Analysis CSVs
+```
 
-### Arduino CLI
+Generated files such as `build/`, `captures/`, `logs/`, `.venv/`, and `compile_flags.txt` are intentionally ignored.
+
+## Setup
+
+Install the Arduino toolchain and board support:
 
 ```bash
 brew install arduino-cli
@@ -30,121 +32,123 @@ arduino-cli core install arduino:mbed_nano
 arduino-cli lib install "Arduino_OV767x" "TinyMLShield"
 ```
 
-### Python viewer (optional, needed for camera branches)
+Create the Python environment used by the viewers and data tools:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install pyserial opencv-python numpy
+.venv/bin/pip install pyserial opencv-python numpy flask
 ```
 
----
+Optional: install the Edge Impulse CLI if you want to connect the board directly to Edge Impulse Studio with `./scripts/ei_connect.sh`.
 
-## Connect & Upload
+## Edge Impulse Model
 
-1. Plug the Nano 33 in with a **data** USB cable.
-2. Find your port:
+The firmware expects a library named `pill_counting_inferencing` and includes `pill_counting_inferencing.h`. Install or replace the exported model with:
 
 ```bash
-arduino-cli board list
-# or
+./scripts/ei_deploy.sh ~/Downloads/pill-counting-cpp-mcu.zip
+```
+
+The deploy script accepts Arduino Library and C++ MCU exports. It validates the model against the firmware assumptions:
+
+- input: 96x96 grayscale
+- input type: int8
+- tensor arena target: <=120 KB
+- tensor arena hard limit: <=140 KB
+
+## Build and Upload
+
+Plug in the board, then detect its serial port:
+
+```bash
 ./scripts/port.sh
 ```
 
-3. Upload:
+Compile without flashing:
+
+```bash
+SKIP_UPLOAD=1 ./scripts/upload.sh
+```
+
+Compile and upload:
 
 ```bash
 ./scripts/upload.sh
+```
 
-# Explicit port
+Override the detected port when needed:
+
+```bash
 PORT=/dev/cu.usbmodem1101 ./scripts/upload.sh
 ```
 
-4. Serial monitor:
+`scripts/upload.sh` compiles with `EI_CLASSIFIER_ALLOCATION_STATIC`, reports dynamic memory use, warns above 210 KB, and fails above 220 KB by default. If upload times out, double-tap the Nano 33 reset button to enter the bootloader, rerun `arduino-cli board list`, and upload again.
+
+## Run the Project
+
+Open the serial monitor:
 
 ```bash
 ./scripts/monitor.sh
 ```
 
-**Upload tip (BLE):** If upload times out, double-tap the reset button — the board enters the bootloader and shows a new port. Re-run `board list` and update the port.
-
----
-
-## Edge Impulse Model
-
-Install the exported Edge Impulse model, then upload:
-
-```bash
-./scripts/ei_deploy.sh /Users/temicide/Downloads/pill-counting-cpp-mcu-v2-impulse-#1.zip
-./scripts/upload.sh
-```
-
-The deploy script accepts either the Arduino Library export or the C++ MCU export and installs it as `pill_counting_inferencing`. The sketch includes `pill_counting_inferencing.h`.
-
-Supported production profile:
-
-- Camera capture: **160x120 grayscale** (`QQVGA`, 19,200 bytes)
-- Model input: **96x96 grayscale int8**
-- Edge Impulse arena: target **<=120 KB**, rejected above **140 KB**
-- Upload builds define `EI_CLASSIFIER_ALLOCATION_STATIC` so tensor arena RAM is visible in the compile report instead of being hidden as a runtime heap allocation.
-
-Serial commands after upload:
-
-| Command | Action                    |
-| ------- | ------------------------- |
-| `J`     | Production single-shot JSON count |
-| `C`     | Capture one frame + count |
-| `M`     | Print memory diagnostics  |
-| `T`     | Print capture/inference timing profile |
-| `K`     | Continuous counting       |
-| `D`     | Live detection stream     |
-| `X`     | Stop continuous counting  |
-| `S`     | Start camera streaming    |
-| `P`     | Pause camera streaming    |
-
-Use `J` for the production workflow. It captures one 160x120 grayscale frame,
-runs the 96x96 FOMO model once, and returns one JSON line with `ok`, `count`,
-`boxes`, and `timing_ms`. It does not send image bytes.
-
-Run the browser-based bounding-box viewer after uploading the model firmware:
+Start the browser detection app:
 
 ```bash
 ./scripts/detect_web.sh
 ```
 
-Open http://localhost:5050. The page displays the grayscale camera feed with `blister` boxes, count, FPS, and exposure controls.
+Open <http://localhost:5050>. The app shows the grayscale feed, board-side `blister` boxes, count, FPS, and exposure controls.
 
----
+Other local tools:
 
-## Scripts
-
-| Script                 | Purpose                                      |
-| ---------------------- | -------------------------------------------- |
-| `scripts/upload.sh`    | Compile and flash via `arduino-cli`          |
-| `scripts/monitor.sh`   | Open serial monitor at 921600 baud           |
-| `scripts/port.sh`      | Auto-detect and print the Nano 33 port       |
-| `scripts/live_view.sh` | Launch live camera viewer (grayscale branch) |
-| `scripts/live_detect.sh` | Launch model detection viewer with boxes   |
-| `scripts/detect_web.sh` | Launch browser detection app with boxes    |
-
----
-
-## Project Structure
-
-```
-nano_33/
-├── nano_33/nano_33.ino       # Main Arduino sketch
-├── scripts/                  # Shell + Python helper scripts
-├── docs/research/            # Research notes and design specs
-└── .gitignore
+```bash
+./scripts/live_view.sh        # OpenCV live camera viewer
+./scripts/live_detect.sh      # OpenCV detection viewer with boxes
+./scripts/collect.sh          # Browser image collector at http://localhost:5000
+./scripts/collect_detect.sh   # Detection-assisted collector at http://localhost:5001
 ```
 
----
+Training captures are saved to `docs/training_data/` as `blister_0001.png` style files. The detection-assisted collector also writes matching JSON metadata.
+
+## Serial Commands
+
+The firmware prints `NANO33_OV7675_READY` at startup and accepts single-character commands at 921600 baud:
+
+| Command | Action |
+| --- | --- |
+| `S` | Start raw frame streaming |
+| `P` | Pause streaming |
+| `J` | Production single-shot JSON count |
+| `C` | Single count with text output |
+| `K` | Continuous count mode |
+| `D` | Detection stream with frame bytes and boxes |
+| `X` | Stop count or detection mode |
+| `F` | Apply face/exposure preset |
+| `A` | Return to auto exposure |
+| `c` | Apply calibrated exposure preset |
+| `T` | Print capture/inference timing profile |
+| `M` | Print memory/model diagnostics |
+| `?` | Reprint status and command help |
+
+Use `J` for production-style count checks. It captures one frame, runs inference once, and returns a JSON line with fields such as `ok`, `count`, `boxes`, and `timing_ms`.
+
+## Model and Data Checks
+
+When the Edge Impulse library is installed, validate sample training images with:
+
+```bash
+.venv/bin/python scripts/test_training_data.py --limit 10 --rebuild
+```
+
+This builds a local C++ classifier runner under `build/`, preprocesses `docs/training_data/*.png` the same way as firmware, and writes a CSV summary.
 
 ## Troubleshooting
 
-| Issue                    | Fix                                                       |
-| ------------------------ | --------------------------------------------------------- |
-| No port in `board list`  | Try another cable; use a data-capable USB cable           |
-| Upload timeout (BLE)     | Double-tap reset button, re-run `board list`, update port |
-| Wrong board selected     | FQBN: `arduino:mbed_nano:nano33ble`                       |
-| Extension can't find CLI | `which arduino-cli` → `/opt/homebrew/bin/arduino-cli`     |
+| Issue | Fix |
+| --- | --- |
+| `No Nano 33 USB port found` | Use a data-capable cable and run `arduino-cli board list`. |
+| Upload timeout | Double-tap reset, select the bootloader port, and rerun upload. |
+| Missing model header | Run `./scripts/ei_deploy.sh <export.zip>` and confirm the installed Arduino library is `pill_counting_inferencing`. |
+| Browser tool cannot connect | Confirm no serial monitor is holding the port, then pass `PORT=/dev/cu...` to the script. |
+| RAM limit failure | Re-export a smaller Edge Impulse model, for example with EON RAM optimized settings or a smaller FOMO backbone. |
